@@ -1,0 +1,47 @@
+# Snowflake Connection Configuration
+snowflake:
+  account: <your_account>  # e.g., "xy12345.us-east-1"
+  user: <your_user>  # Optional if using SSO
+  password: <your_password>  # Optional if using SSO
+  warehouse: <your_warehouse>
+  database: <your_database>
+  schema: <your_schema>
+  authenticator: externalbrowser  # 'externalbrowser' for SSO or 'snowflake' for username/password
+
+# Summary Worksheet Configuration
+summary:
+  table_name: <summary_table_name>  # Table with Schedule_ID, Description, Value columns
+  schedule_titles:
+    1: "Schedule 1 - General Information"
+    2: "Schedule 2 - Claimants"
+    3: "Schedule 3 - Claimant Requests Denied/Not Paid"
+    4: "Schedule 4"  # Update with actual title when available
+    5: "Schedule 5"  # Update with actual title when available
+    6: "Schedule 6"  # Update with actual title when available
+
+# Worksheet to Table Mapping for Detail Worksheets
+# Each worksheet name maps to its corresponding Snowflake table name
+# All column structures, summaries, and formatting are hardcoded in Python based on template images
+worksheets:
+  1-001: <table_name_1_001>
+  1-004: <table_name_1_004>
+  1-006: <table_name_1_006>
+  2-001: <table_name_2_001>
+  2-002: <table_name_2_002>
+  2-003: <table_name_2_003>
+  2-004: <table_name_2_004>
+  2-005: <table_name_2_005>
+  3-001: <table_name_3_001>
+  3-003: <table_name_3_003>
+  3-004: <table_name_3_004>
+  3-005: <table_name_3_005>
+  3-006: <table_name_3_006>
+  3-007: <table_name_3_007>
+  5-001: <table_name_5_001>
+  5-002: <table_name_5_002>
+  5-003: <table_name_5_003>
+  5-004: <table_name_5_004>
+  6-001: <table_name_6_001>
+  6-002: <table_name_6_002>
+  6-003: <table_name_6_003>
+  6-004: <table_name_6_004>
