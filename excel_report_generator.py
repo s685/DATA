@@ -1317,29 +1317,53 @@ def load_config(config_path: str) -> Dict[str, Any]:
 
 
 def parse_config(config: Dict[str, Any]) -> Tuple[SnowflakeConfig, Dict[str, str], List[WorksheetConfig], Dict[str, Any]]:
-    """Parse configuration: Snowflake settings, worksheet-to-table mapping, and summary config"""
-    if 'snowflake' not in config:
-        raise ValueError("Missing 'snowflake' section in configuration file")
-    
-    snowflake_dict = config['snowflake']
+    """
+    Parse configuration: Snowflake settings, worksheet-to-table mapping, and summary config
+    Snowflake connection parameters are read from environment variables first, then fall back to config.yaml
+    """
+    # Get Snowflake config from environment variables (preferred) or config file
+    # Environment variables take precedence for security
+    account = os.getenv('SNOWFLAKE_ACCOUNT') or (config.get('snowflake', {}).get('account') if 'snowflake' in config else None)
+    user = os.getenv('SNOWFLAKE_USER') or (config.get('snowflake', {}).get('user') if 'snowflake' in config else None)
+    password = os.getenv('SNOWFLAKE_PASSWORD') or (config.get('snowflake', {}).get('password') if 'snowflake' in config else None)
+    warehouse = os.getenv('SNOWFLAKE_WAREHOUSE') or (config.get('snowflake', {}).get('warehouse') if 'snowflake' in config else None)
+    database = os.getenv('SNOWFLAKE_DATABASE') or (config.get('snowflake', {}).get('database') if 'snowflake' in config else None)
+    schema = os.getenv('SNOWFLAKE_SCHEMA') or (config.get('snowflake', {}).get('schema') if 'snowflake' in config else None)
+    authenticator = os.getenv('SNOWFLAKE_AUTHENTICATOR') or (config.get('snowflake', {}).get('authenticator', 'externalbrowser') if 'snowflake' in config else 'externalbrowser')
     
     # Validate required fields
-    required_fields = ['account', 'warehouse', 'database', 'schema', 'authenticator']
-    for field in required_fields:
-        if not snowflake_dict.get(field):
-            raise ValueError(f"Missing required Snowflake config field: {field}")
+    required_fields = {
+        'account': account,
+        'warehouse': warehouse,
+        'database': database,
+        'schema': schema,
+        'authenticator': authenticator
+    }
     
-    # Support password from environment variable if not in config
-    password = snowflake_dict.get('password') or os.getenv('SNOWFLAKE_PASSWORD')
+    missing_fields = [field for field, value in required_fields.items() if not value]
+    if missing_fields:
+        raise ValueError(
+            f"Missing required Snowflake configuration. "
+            f"Set environment variables or config.yaml for: {', '.join(missing_fields)}. "
+            f"Environment variables: SNOWFLAKE_ACCOUNT, SNOWFLAKE_WAREHOUSE, SNOWFLAKE_DATABASE, SNOWFLAKE_SCHEMA, SNOWFLAKE_AUTHENTICATOR"
+        )
+    
+    # For username/password auth, validate credentials are provided
+    if authenticator == 'snowflake':
+        if not user or not password:
+            raise ValueError(
+                "For 'snowflake' authenticator, SNOWFLAKE_USER and SNOWFLAKE_PASSWORD "
+                "must be set (via environment variables or config.yaml)"
+            )
     
     snowflake_cfg = SnowflakeConfig(
-        account=snowflake_dict['account'],
-        user=snowflake_dict.get('user') or os.getenv('SNOWFLAKE_USER'),
+        account=account,
+        user=user,
         password=password,
-        warehouse=snowflake_dict['warehouse'],
-        database=snowflake_dict['database'],
-        schema=snowflake_dict['schema'],
-        authenticator=snowflake_dict['authenticator']
+        warehouse=warehouse,
+        database=database,
+        schema=schema,
+        authenticator=authenticator
     )
     
     # Get worksheet to table mapping (exclude Summary if present)

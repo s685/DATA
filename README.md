@@ -23,41 +23,87 @@ pip install -r requirements.txt
 
 ## Configuration
 
-All worksheet structures are **hardcoded** in the Python file based on the template images. You only need to provide Snowflake connection details and table name.
+### Environment Variables (Recommended for Security)
+
+For production deployments, it's **strongly recommended** to use environment variables for Snowflake credentials:
+
+```bash
+# Required
+export SNOWFLAKE_ACCOUNT="xy12345.us-east-1"
+export SNOWFLAKE_WAREHOUSE="your_warehouse"
+export SNOWFLAKE_DATABASE="your_database"
+export SNOWFLAKE_SCHEMA="your_schema"
+
+# Optional - defaults to 'externalbrowser' (SSO)
+export SNOWFLAKE_AUTHENTICATOR="externalbrowser"  # or "snowflake" for username/password
+
+# Required only if SNOWFLAKE_AUTHENTICATOR="snowflake"
+export SNOWFLAKE_USER="your_username"
+export SNOWFLAKE_PASSWORD="your_password"
+```
+
+**Environment variables take precedence** over values in `config.yaml`. This is the recommended approach for production.
+
+### Configuration File
+
+Create a `config.yaml` file with worksheet-to-table mappings. Snowflake connection details can be provided here as a fallback, but environment variables are preferred.
+
+All worksheet structures are **hardcoded** in the Python file based on the template images. You only need to provide Snowflake connection details and table name mappings.
 
 ## Usage
 
-Run the script with Snowflake connection parameters and output path:
+Run the script with configuration file and date parameters:
 
 ```bash
-python excel_report_generator.py --account <account> --warehouse <warehouse> --database <database> --schema <schema> --table <table_name> --output report.xlsx
+python excel_report_generator.py --config config.yaml --output report.xlsx --report-start-dt 2024-01-01 --report-end-dt 2024-12-31
 ```
 
 ### Arguments
 
 **Required:**
-- `--account`: Snowflake account identifier (e.g., "xy12345.us-east-1")
-- `--warehouse`: Snowflake warehouse name
-- `--database`: Database name
-- `--schema`: Schema name
-- `--table`: Snowflake table name (used in all queries)
+- `--config`: Path to YAML configuration file with worksheet-to-table mappings
 - `--output`: Path for output Excel file
+- `--report-start-dt`: Report start date (format: YYYY-MM-DD, MM/DD/YYYY, etc.)
+- `--report-end-dt`: Report end date (format: YYYY-MM-DD, MM/DD/YYYY, etc.)
 
-**Optional:**
-- `--user`: Snowflake username (required if using password auth)
-- `--password`: Snowflake password (required if using password auth)
-- `--authenticator`: Authentication method - `externalbrowser` (SSO, default) or `snowflake` (username/password)
+**Note:** Snowflake connection parameters should be set via environment variables (see Configuration section above).
 
 ### Examples
 
-**Using SSO (External Browser):**
+**Using SSO (External Browser) with Environment Variables:**
 ```bash
-python excel_report_generator.py --account xy12345.us-east-1 --warehouse MY_WH --database MY_DB --schema MY_SCHEMA --table claims_table --output MCAS_Reporting_Year_2024_CCC_v1.xlsx
+# Set environment variables
+export SNOWFLAKE_ACCOUNT="xy12345.us-east-1"
+export SNOWFLAKE_WAREHOUSE="MY_WH"
+export SNOWFLAKE_DATABASE="MY_DB"
+export SNOWFLAKE_SCHEMA="MY_SCHEMA"
+export SNOWFLAKE_AUTHENTICATOR="externalbrowser"
+
+# Run the script
+python excel_report_generator.py \
+  --config config.yaml \
+  --output MCAS_Reporting_Year_2024_CCC_v1.xlsx \
+  --report-start-dt 2024-01-01 \
+  --report-end-dt 2024-12-31
 ```
 
-**Using Username/Password:**
+**Using Username/Password with Environment Variables:**
 ```bash
-python excel_report_generator.py --account xy12345.us-east-1 --warehouse MY_WH --database MY_DB --schema MY_SCHEMA --table claims_table --user myuser --password mypass --authenticator snowflake --output MCAS_Reporting_Year_2024_CCC_v1.xlsx
+# Set environment variables
+export SNOWFLAKE_ACCOUNT="xy12345.us-east-1"
+export SNOWFLAKE_WAREHOUSE="MY_WH"
+export SNOWFLAKE_DATABASE="MY_DB"
+export SNOWFLAKE_SCHEMA="MY_SCHEMA"
+export SNOWFLAKE_AUTHENTICATOR="snowflake"
+export SNOWFLAKE_USER="myuser"
+export SNOWFLAKE_PASSWORD="mypass"
+
+# Run the script
+python excel_report_generator.py \
+  --config config.yaml \
+  --output MCAS_Reporting_Year_2024_CCC_v1.xlsx \
+  --report-start-dt 2024-01-01 \
+  --report-end-dt 2024-12-31
 ```
 
 ## Hardcoded Worksheet Structures
