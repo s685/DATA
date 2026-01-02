@@ -1018,19 +1018,29 @@ def fetch_detail_records(connection: snowflake.connector.SnowflakeConnection, qu
 
 
 def get_tat_range(tat_value: Any) -> str:
-    """Categorize TAT value into range buckets"""
+    """
+    Categorize TAT value into range buckets based on TAT_in_Days column.
+    
+    Categories:
+    - -1 < x < 31: 0 to 30 days
+    - x > 30 and x < 61: 31 to 60 days
+    - 60 to 91: 61 to 90 days
+    - > 90: 91+ days
+    """
     try:
-        tat = float(tat_value) if tat_value is not None else 0
-        if -1 <= tat < 31:  # -1 to <31 (i.e., -1 to 30)
+        if tat_value is None:
+            return None
+        tat = float(tat_value)
+        if -1 < tat < 31:  # -1 < x < 31 (i.e., 0 to 30)
             return "-1 to <31"
-        elif 31 <= tat < 61:  # >30 and <61 (i.e., 31 to 60)
+        elif 30 < tat < 61:  # x > 30 and x < 61 (i.e., 31 to 60)
             return ">30 and <61"
-        elif 61 <= tat < 91:  # >60 and <91 (i.e., 61 to 90)
+        elif 60 < tat <= 90:  # 60 to 91 (i.e., 61 to 90)
             return ">60 and <91"
-        elif tat >= 91:  # >90 (i.e., 91 and above)
+        elif tat > 90:  # > 90 (i.e., 91 and above)
             return ">90"
         else:
-            return None  # Exclude from summary
+            return None  # Exclude from summary (handles edge cases like exactly -1, 30, 60, 91)
     except (ValueError, TypeError):
         return None  # Exclude from summary
 
@@ -1042,13 +1052,38 @@ def generate_summary(detail_records: List[Dict[str, Any]], summary_config: Summa
     
     # Special handling for TAT_Range grouping
     if summary_config.group_by == 'TAT_Range':
+        # Helper for case-insensitive field access
+        def get_tat_value_case_insensitive(record, field_name):
+            """Get TAT_in_Days value with case-insensitive matching"""
+            # Try exact match first
+            if field_name in record:
+                return record[field_name]
+            # Try case-insensitive match
+            for key, value in record.items():
+                if key.upper() == field_name.upper():
+                    return value
+            # Try common variations
+            variations = [
+                'TAT_IN_DAYS', 'tat_in_days', 'Tat_In_Days',
+                'TAT_DAYS', 'tat_days', 'Tat_Days',
+                'TAT', 'tat', 'Tat'
+            ]
+            for var in variations:
+                if var in record:
+                    return record[var]
+            return None
+        
         for record in detail_records:
-            # Get TAT_in_Days value and categorize into range
-            tat_value = record.get('TAT_in_Days', None)
+            # Get TAT_in_Days value with case-insensitive matching and categorize into range
+            tat_value = get_tat_value_case_insensitive(record, 'TAT_in_Days')
             group_key = get_tat_range(tat_value)
-            # Include all records with valid TAT ranges (including -1 to <31)
+            # Include all records with valid TAT ranges
             if group_key is not None:
                 grouped[group_key].append(record)
+            else:
+                # Debug: show records that were excluded (only first few to avoid spam)
+                if len([r for r in detail_records if get_tat_value_case_insensitive(r, 'TAT_in_Days') == tat_value]) <= 3:
+                    print(f"  DEBUG: Excluded record with TAT_in_Days={tat_value} (not in valid range)")
     else:
         # Standard grouping by field value
         # Handle case-insensitive column name matching
