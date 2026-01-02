@@ -1414,12 +1414,22 @@ def generate_summary(detail_records: List[Dict[str, Any]], summary_config: Summa
             if len(summary_config.aggregates) > 1 and any(a.function.upper() in ('SUM', 'FIRST') for a in summary_config.aggregates):
                 print(f"  DEBUG: Aggregate '{agg.label}' (field='{field_value}', function='{function}') = {value}")
             
-            # Accumulate for grand total
+            # Accumulate for grand total (only for numeric values)
             if include_grand_total:
                 if agg.label not in grand_total_values:
-                    grand_total_values[agg.label] = 0
-                if isinstance(value, (int, float)):
+                    # Initialize based on function type
+                    if function in ('SUM', 'COUNT', 'AVG', 'AVERAGE', 'MIN', 'MAX'):
+                        grand_total_values[agg.label] = 0
+                    else:
+                        grand_total_values[agg.label] = None  # For FIRST, etc., don't accumulate
+                if isinstance(value, (int, float)) and function in ('SUM', 'COUNT', 'AVG', 'AVERAGE'):
                     grand_total_values[agg.label] += value
+                elif function == 'MAX' and isinstance(value, (int, float)):
+                    if grand_total_values[agg.label] is None or value > grand_total_values[agg.label]:
+                        grand_total_values[agg.label] = value
+                elif function == 'MIN' and isinstance(value, (int, float)):
+                    if grand_total_values[agg.label] is None or value < grand_total_values[agg.label]:
+                        grand_total_values[agg.label] = value
         
         summary_rows.append(summary_row)
     
@@ -1448,7 +1458,11 @@ def generate_summary(detail_records: List[Dict[str, Any]], summary_config: Summa
         else:
             grand_total_row = {summary_config.columns[0]: 'Grand Total'}
         for agg in summary_config.aggregates:
-            grand_total_row[agg.label] = grand_total_values.get(agg.label, 0)
+            # For FIRST/VALUE functions (like Company), don't show a value in grand total
+            if agg.function.upper() in ('FIRST', 'VALUE'):
+                grand_total_row[agg.label] = ''  # Empty for string fields
+            else:
+                grand_total_row[agg.label] = grand_total_values.get(agg.label, 0)
         
         # Add percentage for grand total (should be 100%)
         if '% of Total' in summary_config.columns:
