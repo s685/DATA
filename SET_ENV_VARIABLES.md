@@ -10,9 +10,14 @@ The following environment variables are **required** for the script to work:
 - `SNOWFLAKE_SCHEMA` - Your Snowflake schema name
 - `SNOWFLAKE_AUTHENTICATOR` - Authentication method: "externalbrowser" (SSO) or "snowflake" (username/password)
 
-**Optional** (only if using username/password authentication):
+**Optional but may be required:**
 - `SNOWFLAKE_USER` - Your Snowflake username
-- `SNOWFLAKE_PASSWORD` - Your Snowflake password
+  - **Required** if `SNOWFLAKE_AUTHENTICATOR="snowflake"` (username/password)
+  - **May be required** for some Snowflake configurations even with `externalbrowser` (SSO)
+  - If you get "user is empty" error, set this variable
+
+**Optional** (only if using username/password authentication):
+- `SNOWFLAKE_PASSWORD` - Your Snowflake password (required if `SNOWFLAKE_AUTHENTICATOR="snowflake"`)
 
 ---
 

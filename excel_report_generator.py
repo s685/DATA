@@ -854,12 +854,29 @@ def create_snowflake_connection(config: SnowflakeConfig) -> snowflake.connector.
                 raise ValueError("User and password required for 'snowflake' authenticator")
             conn_params['user'] = config.user
             conn_params['password'] = config.password
+        elif config.authenticator == 'externalbrowser':
+            # For externalbrowser (SSO), user is optional
+            # If provided and not empty, use it; otherwise don't pass it (Snowflake will use SSO user)
+            if config.user and config.user.strip():
+                conn_params['user'] = config.user.strip()
+            # Note: Some Snowflake configurations may require user even for externalbrowser
+            # If you get "user is empty" error, set SNOWFLAKE_USER environment variable
         
         connection = snowflake.connector.connect(**conn_params)
         print(f"Successfully connected to Snowflake account: {config.account}")
         return connection
     except Exception as e:
-        print(f"Error connecting to Snowflake: {e}")
+        error_msg = str(e)
+        if 'user' in error_msg.lower() and 'empty' in error_msg.lower():
+            print(f"Error connecting to Snowflake: {e}")
+            print("\nTROUBLESHOOTING:")
+            print("Your Snowflake configuration requires a USER parameter even for SSO authentication.")
+            print("Please set the SNOWFLAKE_USER environment variable:")
+            print("  PowerShell: $env:SNOWFLAKE_USER = 'your_username'")
+            print("  Command Prompt: set SNOWFLAKE_USER=your_username")
+            print("  Or add 'user: your_username' to the snowflake section in config.yaml")
+        else:
+            print(f"Error connecting to Snowflake: {e}")
         sys.exit(1)
 
 
