@@ -1205,7 +1205,7 @@ def generate_summary(detail_records: List[Dict[str, Any]], summary_config: Summa
                 summary_row['% of Total'] = "0%"
     
     # Add Grand Total row if requested
-    if include_grand_total and grand_total_values:
+    if include_grand_total:
         # For TAT_Range, first column should be empty (no "Grand Total" label)
         if summary_config.group_by == 'TAT_Range':
             grand_total_row = {summary_config.columns[0]: ''}  # Empty for TAT range
@@ -1235,12 +1235,17 @@ def process_worksheet_data(connection: snowflake.connector.SnowflakeConnection,
     if worksheet_config.summary_config:
         for sum_config in worksheet_config.summary_config:
             # Include Grand Total for Schedule 1 worksheets (1-001, 1-004, 1-006)
-            # Also include for direct_dump_state_summary worksheets (Schedule 2, etc.)
+            # Also include for all state summaries (Issue_State, Resident_State)
             include_grand_total = worksheet_config.name in ['1-001', '1-004', '1-006']
-            # For state summaries (Issue_State, Resident_State), also include grand total
+            # For state summaries (Issue_State, Resident_State), always include grand total
             if sum_config.group_by in ['Issue_State', 'Resident_State']:
                 include_grand_total = True
+            print(f"  DEBUG: Generating summary for '{sum_config.group_by}', include_grand_total={include_grand_total}")
             summary_data = generate_summary(detail_records, sum_config, include_grand_total=include_grand_total)
+            # Debug: Check if grand total row was added
+            if summary_data:
+                has_grand_total = any(row.get(sum_config.columns[0]) == 'Grand Total' for row in summary_data)
+                print(f"  DEBUG: Summary has {len(summary_data)} rows, grand total present: {has_grand_total}")
             summaries.append(summary_data)
     
     return detail_records, summaries
