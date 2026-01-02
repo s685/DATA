@@ -1350,6 +1350,11 @@ def create_summary_worksheet(wb, summary_data, schedule_titles=None, reporting_p
     schedule_titles: Dict mapping schedule number to title
     reporting_period: String like "January 1, 2024 through December 31, 2024" or None to use default
     """
+    # Validate input
+    if not summary_data:
+        print("  WARNING: No summary data provided to create_summary_worksheet!")
+        summary_data = []
+    
     ws = wb.create_sheet(title="Summary")
     
     # Font: Aptos Narrow, size 12
@@ -1391,21 +1396,76 @@ def create_summary_worksheet(wb, summary_data, schedule_titles=None, reporting_p
     
     # Group data by schedule number (1-xxx, 2-xxx, 3-xxx, etc.)
     schedule_groups = defaultdict(list)
+    
+    # Handle case-insensitive column name matching
+    def get_value_case_insensitive(row, key):
+        """Get value from row with case-insensitive key matching"""
+        for k, v in row.items():
+            if k.upper() == key.upper():
+                return v
+        return row.get(key, '')
+    
     for row in summary_data:
-        schedule_id = row.get('Schedule_ID', '')
-        if '-' in schedule_id:
-            schedule_num = int(schedule_id.split('-')[0])
-            schedule_groups[schedule_num].append(row)
+        # Try to get Schedule_ID with case-insensitive matching
+        # Accept: Schedule_ID, SCHEDULE_ID, schedule_id, ScheduleID, SCHEDULEID, ID, id
+        schedule_id = get_value_case_insensitive(row, 'Schedule_ID') or \
+                     get_value_case_insensitive(row, 'ScheduleID') or \
+                     get_value_case_insensitive(row, 'SCHEDULEID') or \
+                     get_value_case_insensitive(row, 'ID') or \
+                     str(row.get(list(row.keys())[0], '')) if row else ''
+        
+        # Group by schedule number if Schedule_ID contains a dash (e.g., "1-001", "2-003")
+        if '-' in str(schedule_id):
+            try:
+                schedule_num = int(str(schedule_id).split('-')[0])
+                schedule_groups[schedule_num].append(row)
+            except (ValueError, IndexError):
+                # If parsing fails, put in a default group (0)
+                schedule_groups[0].append(row)
+        else:
+            # If no dash, try to extract number from beginning or use default group
+            try:
+                # Try to extract number from start of string
+                import re
+                match = re.match(r'^(\d+)', str(schedule_id))
+                if match:
+                    schedule_num = int(match.group(1))
+                    schedule_groups[schedule_num].append(row)
+                else:
+                    schedule_groups[0].append(row)
+            except:
+                schedule_groups[0].append(row)
     
     # Sort groups by schedule number
     sorted_groups = sorted(schedule_groups.items())
     
+    # Debug output
+    if not sorted_groups:
+        print(f"  WARNING: No data grouped! Total records: {len(summary_data)}")
+        if summary_data:
+            print(f"  First record keys: {list(summary_data[0].keys())}")
+            print(f"  First record values: {list(summary_data[0].values())}")
+            # If no groups were created, create a single group with all data
+            print(f"  Creating default group with all {len(summary_data)} records")
+            sorted_groups = [(0, summary_data)]
+    
     # Starting row for first schedule - row 6 (after header rows 2-4, with 1 empty row gap)
     current_row = 6
     
+    # Debug: Print grouping info
+    total_rows_to_write = sum(len(rows) for _, rows in sorted_groups)
+    print(f"  Writing {total_rows_to_write} rows across {len(sorted_groups)} schedule group(s)")
+    
     for schedule_num, rows in sorted_groups:
-        # Sort rows by Schedule_ID
-        rows.sort(key=lambda x: x.get('Schedule_ID', ''))
+        # Sort rows by Schedule_ID or ID (case-insensitive)
+        def get_sort_key(row):
+            """Get sort key from row - tries Schedule_ID, then ID, then first column"""
+            for key in ['Schedule_ID', 'SCHEDULE_ID', 'schedule_id', 'ScheduleID', 'ID', 'id']:
+                if key in row:
+                    return str(row[key])
+            # Fallback to first column value
+            return str(list(row.values())[0]) if row else ''
+        rows.sort(key=get_sort_key)
         
         # Write Schedule title - left aligned, column A
         title_row = current_row
@@ -1446,8 +1506,16 @@ def create_summary_worksheet(wb, summary_data, schedule_titles=None, reporting_p
         for idx, row_data in enumerate(rows):
             row_num = data_start_row + idx
             
-            # Column A: Schedule_ID (e.g., "2-001")
-            schedule_id = row_data.get('Schedule_ID', '')
+            # Helper function for case-insensitive column access
+            def get_col_value(row, col_name):
+                """Get value from row with case-insensitive column name matching"""
+                for k, v in row.items():
+                    if k.upper() == col_name.upper():
+                        return v
+                return row.get(col_name, '')
+            
+            # Column A: Schedule_ID (e.g., "2-001") - also accepts ID, id
+            schedule_id = get_col_value(row_data, 'Schedule_ID') or get_col_value(row_data, 'ID')
             id_cell = ws.cell(row=row_num, column=1)
             id_cell.value = schedule_id
             id_cell.font = default_font
@@ -1455,7 +1523,7 @@ def create_summary_worksheet(wb, summary_data, schedule_titles=None, reporting_p
             apply_border(ws, row_num, 1)
             
             # Column C: Description (Column B is gap)
-            description = row_data.get('Description', '')
+            description = get_col_value(row_data, 'Description')
             desc_cell = ws.cell(row=row_num, column=3)
             desc_cell.value = description
             desc_cell.font = default_font
@@ -1463,7 +1531,7 @@ def create_summary_worksheet(wb, summary_data, schedule_titles=None, reporting_p
             apply_border(ws, row_num, 3)
             
             # Column E: Value (Column D is gap, highlighted in yellow)
-            value = row_data.get('Value', '')
+            value = get_col_value(row_data, 'Value')
             value_cell = ws.cell(row=row_num, column=5)
             
             # Format numeric values with thousand separators (commas) - US format: 101,037
@@ -1624,6 +1692,19 @@ def create_workbook(connection: snowflake.connector.SnowflakeConnection,
         
         summary_data = execute_query(connection, query, database, schema)
         print(f"  Fetched {len(summary_data)} summary records")
+        
+        # Debug: Print column names from first record if available
+        if summary_data and len(summary_data) > 0:
+            print(f"  Column names in query result: {list(summary_data[0].keys())}")
+            # Check if required columns exist (case-insensitive)
+            required_cols = ['Schedule_ID', 'Description', 'Value']
+            actual_cols = [col.upper() for col in summary_data[0].keys()]
+            missing_cols = [col for col in required_cols if col.upper() not in actual_cols]
+            if missing_cols:
+                print(f"  WARNING: Missing expected columns (case-insensitive): {missing_cols}")
+                print(f"  Your query should return columns: Schedule_ID, Description, Value")
+        else:
+            print(f"  WARNING: No summary data returned from query!")
         
         # Convert schedule_titles from config (may be strings like "1", "2") to integers
         schedule_titles_dict = {}
