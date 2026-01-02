@@ -131,13 +131,13 @@ def create_summary_config_from_template_type(template_type: str, detail_columns_
         summary_configs = [
             SummaryConfig(
                 group_by='Issue_State',
-                aggregates=[AggregateConfig(field='Policy_Num', function='COUNT', label='Count')],
+                aggregates=[AggregateConfig(field='', function='COUNT', label='Count')],  # Empty field = count records
                 start_column=issue_start,
                 columns=['Issue State', 'Count']
             ),
             SummaryConfig(
                 group_by='Resident_State',
-                aggregates=[AggregateConfig(field='Policy_Num', function='COUNT', label='Count')],
+                aggregates=[AggregateConfig(field='', function='COUNT', label='Count')],  # Empty field = count records
                 start_column=resident_start,
                 columns=['Resident State', 'Count']
             )
@@ -248,19 +248,19 @@ def create_summary_config_from_template_type(template_type: str, detail_columns_
         summary_configs = [
             SummaryConfig(
                 group_by='Issue_State',
-                aggregates=[AggregateConfig(field='Policy_Num', function='COUNT', label='Count')],
+                aggregates=[AggregateConfig(field='', function='COUNT', label='Count')],  # Empty field = count records
                 start_column=issue_start,
                 columns=['Issue State', 'Count']
             ),
             SummaryConfig(
                 group_by='Resident_State',
-                aggregates=[AggregateConfig(field='Policy_Num', function='COUNT', label='Count')],
+                aggregates=[AggregateConfig(field='', function='COUNT', label='Count')],  # Empty field = count records
                 start_column=resident_start,
                 columns=['Resident State', 'Count']
             ),
             SummaryConfig(
                 group_by='Year_Pay_Req_Received',
-                aggregates=[AggregateConfig(field='Policy_Num', function='COUNT', label='Counts')],
+                aggregates=[AggregateConfig(field='', function='COUNT', label='Counts')],  # Empty field = count records
                 start_column=payreq_start,
                 columns=['Year Pay Req Received', 'Counts']
             )
@@ -316,7 +316,9 @@ def create_worksheet_config_from_template(worksheet_name: str, table_name: str, 
             query = f"SELECT Policy_Num, Claim_Num, Product, Claim_Status, Company, Issue_State, Resident_State, TAT_in_Days FROM {table_name} {where_clause}"
         elif 'payreq' in template_type.lower():
             # Include Year_Pay_Req_Received for pay req summaries
-            query = f"SELECT Policy_Num, Claim_Num, Product, Claim_Status, Company, Issue_State, Resident_State, Year_Pay_Req_Received FROM {table_name} {where_clause}"
+            # Only select columns needed for summaries (grouping columns)
+            # User should provide custom query if they need detail columns with different names
+            query = f"SELECT Issue_State, Resident_State, Year_Pay_Req_Received FROM {table_name} {where_clause}"
         else:
             # Default query for state summaries or direct dump
             query = f"SELECT Policy_Num, Claim_Num, Product, Claim_Status, Company, Issue_State, Resident_State FROM {table_name} {where_clause}"
@@ -481,13 +483,13 @@ def get_hardcoded_worksheet_structure(worksheet_name: str, table_name: str) -> O
             summary_config=[
                 SummaryConfig(
                     group_by='Issue_State',
-                    aggregates=[AggregateConfig(field='Policy_Num', function='COUNT', label='Count')],
+                    aggregates=[AggregateConfig(field='', function='COUNT', label='Count')],  # Empty field = count records
                     start_column='I',  # Start after gap column H (Issue State: I-J)
                     columns=['Issue State', 'Count']
                 ),
                 SummaryConfig(
                     group_by='Resident_State',
-                    aggregates=[AggregateConfig(field='Policy_Num', function='COUNT', label='Count')],
+                    aggregates=[AggregateConfig(field='', function='COUNT', label='Count')],  # Empty field = count records
                     start_column='L',  # One column gap after Issue State summary (gap K, Resident State: L-M)
                     columns=['Resident State', 'Count']
                 )
@@ -506,13 +508,13 @@ def get_hardcoded_worksheet_structure(worksheet_name: str, table_name: str) -> O
             summary_config=[
                 SummaryConfig(
                     group_by='Issue_State',
-                    aggregates=[AggregateConfig(field='Policy_Num', function='COUNT', label='Count')],
+                    aggregates=[AggregateConfig(field='', function='COUNT', label='Count')],  # Empty field = count records
                     start_column='I',  # Issue State: I-J
                     columns=['Issue State', 'Count']
                 ),
                 SummaryConfig(
                     group_by='Resident_State',
-                    aggregates=[AggregateConfig(field='Policy_Num', function='COUNT', label='Count')],
+                    aggregates=[AggregateConfig(field='', function='COUNT', label='Count')],  # Empty field = count records
                     start_column='L',  # Gap K, Resident State: L-M
                     columns=['Resident State', 'Count']
                 )
@@ -550,13 +552,13 @@ def get_hardcoded_worksheet_structure(worksheet_name: str, table_name: str) -> O
             summary_config=[
                 SummaryConfig(
                     group_by='Issue_State',
-                    aggregates=[AggregateConfig(field='Policy_Num', function='COUNT', label='Count')],
+                    aggregates=[AggregateConfig(field='', function='COUNT', label='Count')],  # Empty field = count records
                     start_column='I',  # Issue State: I-J
                     columns=['Issue State', 'Count']
                 ),
                 SummaryConfig(
                     group_by='Resident_State',
-                    aggregates=[AggregateConfig(field='Policy_Num', function='COUNT', label='Count')],
+                    aggregates=[AggregateConfig(field='', function='COUNT', label='Count')],  # Empty field = count records
                     start_column='L',  # Gap K, Resident State: L-M
                     columns=['Resident State', 'Count']
                 )
@@ -575,13 +577,13 @@ def get_hardcoded_worksheet_structure(worksheet_name: str, table_name: str) -> O
             summary_config=[
                 SummaryConfig(
                     group_by='Issue_State',
-                    aggregates=[AggregateConfig(field='Policy_Num', function='COUNT', label='Count')],
+                    aggregates=[AggregateConfig(field='', function='COUNT', label='Count')],  # Empty field = count records
                     start_column='I',  # Issue State: I-J
                     columns=['Issue State', 'Count']
                 ),
                 SummaryConfig(
                     group_by='Resident_State',
-                    aggregates=[AggregateConfig(field='Policy_Num', function='COUNT', label='Count')],
+                    aggregates=[AggregateConfig(field='', function='COUNT', label='Count')],  # Empty field = count records
                     start_column='L',  # Gap K, Resident State: L-M
                     columns=['Resident State', 'Count']
                 )
@@ -800,13 +802,13 @@ def get_hardcoded_worksheet_structure(worksheet_name: str, table_name: str) -> O
             summary_config=[
                 SummaryConfig(
                     group_by='Issue_State',
-                    aggregates=[AggregateConfig(field='Policy_Num', function='COUNT', label='Count')],
+                    aggregates=[AggregateConfig(field='', function='COUNT', label='Count')],  # Empty field = count records
                     start_column='I',  # Issue State: I-J
                     columns=['Issue State', 'Count']
                 ),
                 SummaryConfig(
                     group_by='Resident_State',
-                    aggregates=[AggregateConfig(field='Policy_Num', function='COUNT', label='Count')],
+                    aggregates=[AggregateConfig(field='', function='COUNT', label='Count')],  # Empty field = count records
                     start_column='L',  # Gap K, Resident State: L-M
                     columns=['Resident State', 'Count']
                 )
@@ -825,13 +827,13 @@ def get_hardcoded_worksheet_structure(worksheet_name: str, table_name: str) -> O
             summary_config=[
                 SummaryConfig(
                     group_by='Issue_State',
-                    aggregates=[AggregateConfig(field='Policy_Num', function='COUNT', label='Count')],
+                    aggregates=[AggregateConfig(field='', function='COUNT', label='Count')],  # Empty field = count records
                     start_column='I',  # Issue State: I-J
                     columns=['Issue State', 'Count']
                 ),
                 SummaryConfig(
                     group_by='Resident_State',
-                    aggregates=[AggregateConfig(field='Policy_Num', function='COUNT', label='Count')],
+                    aggregates=[AggregateConfig(field='', function='COUNT', label='Count')],  # Empty field = count records
                     start_column='L',  # Gap K, Resident State: L-M
                     columns=['Resident State', 'Count']
                 )
@@ -850,19 +852,19 @@ def get_hardcoded_worksheet_structure(worksheet_name: str, table_name: str) -> O
             summary_config=[
                 SummaryConfig(
                     group_by='Issue_State',
-                    aggregates=[AggregateConfig(field='Policy_Num', function='COUNT', label='Count')],
+                    aggregates=[AggregateConfig(field='', function='COUNT', label='Count')],  # Empty field = count records
                     start_column='J',  # Issue State: J-K
                     columns=['Issue State', 'Count']
                 ),
                 SummaryConfig(
                     group_by='Resident_State',
-                    aggregates=[AggregateConfig(field='Policy_Num', function='COUNT', label='Count')],
+                    aggregates=[AggregateConfig(field='', function='COUNT', label='Count')],  # Empty field = count records
                     start_column='M',  # Gap L, Resident State: M-N
                     columns=['Resident State', 'Count']
                 ),
                 SummaryConfig(
                     group_by='Year_Pay_Req_Received',  # Additional summary by Year
-                    aggregates=[AggregateConfig(field='Policy_Num', function='COUNT', label='Counts')],
+                    aggregates=[AggregateConfig(field='', function='COUNT', label='Counts')],  # Empty field = count records
                     start_column='P',  # Gap O, Year summary: P-Q (Year Pay Req Received, Counts)
                     columns=['Year Pay Req Received', 'Counts']  # Year value first, then Counts
                 )
@@ -1245,7 +1247,37 @@ def generate_summary(detail_records: List[Dict[str, Any]], summary_config: Summa
             function = agg.function.upper()
             
             if function == 'COUNT':
-                value = len(records)
+                # COUNT just counts records - field name is not used, but we can use it for distinct counting if needed
+                # If field is specified and not empty, try to count distinct values
+                if field_value and field_value.strip():
+                    # Helper for case-insensitive field access
+                    def get_field_val(record, field_name):
+                        if field_name in record:
+                            return record[field_name]
+                        for key, val in record.items():
+                            if key.upper() == field_name.upper():
+                                return val
+                        # Try variations
+                        variations = [
+                            field_name.replace('_', ''),
+                            field_name.lower(),
+                            field_name.upper(),
+                            field_name.replace('_', ' '),
+                        ]
+                        for var in variations:
+                            if var in record:
+                                return record[var]
+                        return None
+                    # Count distinct values of the field
+                    unique_values = set()
+                    for record in records:
+                        val = get_field_val(record, field_value)
+                        if val is not None and val != '':
+                            unique_values.add(val)
+                    value = len(unique_values) if unique_values else len(records)
+                else:
+                    # No field specified - just count records
+                    value = len(records)
                 total_count += value  # Accumulate total for percentage
             elif function == 'SUM':
                 # Helper for case-insensitive field access

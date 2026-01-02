@@ -242,8 +242,10 @@ worksheets:
   6-004:
     table_name: <your_schedule6_table_name>
     template_type: direct_dump_state_payreq_summary
-    # Optional: Custom query (must include Year_Pay_Req_Received column)
-    # query: |
-    #   SELECT Policy_Num, Claim_Num, Product, Claim_Status, Company, Issue_State, Resident_State, Year_Pay_Req_Received
-    #   FROM <your_schedule6_table_name>
-    #   WHERE Schedule_ID = '6-004'
+    # Custom query required - include all detail columns you want to display + grouping columns
+    # Must include: Issue_State, Resident_State, Year_Pay_Req_Received
+    # Example (adjust column names to match your table):
+    query: |
+      SELECT Policy, doc_id, Product, Claim_Status, Company, Issue_State, Resident_State, Year_Pay_Req_Received
+      FROM <your_schedule6_table_name>
+      WHERE Schedule_ID = '6-004'
