@@ -1738,14 +1738,14 @@ def create_workbook(connection: snowflake.connector.SnowflakeConnection,
         """Fetch data for a single worksheet"""
         try:
             detail_records, summaries = process_worksheet_data(connection, ws_config, database, schema)
-            return ws_config, detail_records, summaries
+            return ws_config.name, ws_config, detail_records, summaries
         except Exception as e:
             print(f"  Error processing {ws_config.name}: {e}")
             raise
     
     # Use ThreadPoolExecutor for parallel query execution
     # Note: Snowflake connection is thread-safe for read operations
-    worksheet_data = {}
+    worksheet_data = {}  # Key: worksheet name (string), Value: (ws_config, detail_records, summaries)
     max_workers = min(len(worksheets_config), 10)  # Limit to 10 concurrent queries
     
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
@@ -1760,10 +1760,10 @@ def create_workbook(connection: snowflake.connector.SnowflakeConnection,
         for future in as_completed(future_to_worksheet):
             ws_config = future_to_worksheet[future]
             try:
-                ws_config, detail_records, summaries = future.result()
-                worksheet_data[ws_config] = (detail_records, summaries)
+                ws_name, ws_config, detail_records, summaries = future.result()
+                worksheet_data[ws_name] = (ws_config, detail_records, summaries)
                 completed += 1
-                print(f"  [{completed}/{len(worksheets_config)}] Fetched data for {ws_config.name}: {len(detail_records)} records")
+                print(f"  [{completed}/{len(worksheets_config)}] Fetched data for {ws_name}: {len(detail_records)} records")
             except Exception as e:
                 print(f"  Error fetching data for {ws_config.name}: {e}")
                 raise
@@ -1771,8 +1771,8 @@ def create_workbook(connection: snowflake.connector.SnowflakeConnection,
     # Write worksheets sequentially (Excel writing is not thread-safe)
     print(f"\nWriting worksheets to Excel...")
     for ws_config in worksheets_config:
-        if ws_config in worksheet_data:
-            detail_records, summaries = worksheet_data[ws_config]
+        if ws_config.name in worksheet_data:
+            ws_config, detail_records, summaries = worksheet_data[ws_config.name]
             print(f"  Writing worksheet: {ws_config.name}")
             create_worksheet(wb, ws_config, detail_records, summaries)
     
