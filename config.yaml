@@ -1,3 +1,4 @@
+# Summary Worksheet Configuration
 summary:
   table_name: "summary_table"
   query: "SELECT ID, description, value FROM summary_table"
@@ -8,4 +9,156 @@ summary:
     4: "Schedule 4"
     5: "Schedule 5"
     6: "Schedule 6"
-    
+
+# Worksheet Configuration
+# Using advanced format with template_type for all worksheets
+# See CONFIGURATION_GUIDE.md for detailed documentation
+
+worksheets:
+  # Schedule 1 Worksheets
+  
+  # 1-001: Summary only (Issue State + Resident State summaries, no detail records)
+  1-001:
+    table_name: <your_schedule1_table_name>
+    template_type: state_summary_only
+    # Optional: Custom query (if not provided, default query will be generated)
+    # query: |
+    #   SELECT Policy_Num, Issue_State, Resident_State
+    #   FROM <your_schedule1_table_name>
+    #   WHERE Schedule_ID = '1-001'
+  
+  # 1-004: Detail records only (no summaries)
+  1-004:
+    table_name: <your_schedule1_table_name>
+    template_type: direct_dump
+    # Optional: Custom query
+    # query: |
+    #   SELECT Policy, Lapse_Da, Stati, Status_Reas, Company, Issue_St, Resident_St
+    #   FROM <your_schedule1_table_name>
+    #   WHERE Schedule_ID = '1-004'
+  
+  # 1-006: Summary only (Issue State + Resident State summaries, no detail records)
+  1-006:
+    table_name: <your_schedule1_table_name>
+    template_type: state_summary_only
+    # Optional: Custom query
+    # query: |
+    #   SELECT Policy_Num, Issue_State, Resident_State
+    #   FROM <your_schedule1_table_name>
+    #   WHERE Schedule_ID = '1-006'
+  
+  # Schedule 2 Worksheets
+  
+  # 2-001: Detail records + Issue State/Resident State summaries
+  2-001:
+    table_name: <your_schedule2_table_name>
+    template_type: direct_dump_state_summary
+    # Optional: Custom query
+    # query: |
+    #   SELECT Policy_Num, Claim_Num, Product, Claim_Status, Company, Issue_State, Resident_State
+    #   FROM <your_schedule2_table_name>
+    #   WHERE Schedule_ID = '2-001'
+    #     AND Status = 'Active'
+    #   ORDER BY Policy_Num
+  
+  # 2-002: Detail records + Issue State/Resident State summaries
+  2-002:
+    table_name: <your_schedule2_table_name>
+    template_type: direct_dump_state_summary
+    # Optional: Custom query
+    # query: |
+    #   SELECT Policy_Num, Claim_Num, Product, Claim_Status, Company, Issue_State, Resident_State
+    #   FROM <your_schedule2_table_name>
+    #   WHERE Schedule_ID = '2-002'
+  
+  # 2-003: Detail records + TAT summary (with % of Total)
+  2-003:
+    table_name: <your_schedule2_table_name>
+    template_type: direct_dump_tat_summary
+    # Optional: Custom query (must include TAT_in_Days column)
+    # query: |
+    #   SELECT Policy_Num, Claim_Num, Product, Claim_Status, Company, Issue_State, Resident_State, TAT_in_Days
+    #   FROM <your_schedule2_table_name>
+    #   WHERE Schedule_ID = '2-003'
+  
+  # 2-004: Detail records + Issue State/Resident State summaries
+  2-004:
+    table_name: <your_schedule2_table_name>
+    template_type: direct_dump_state_summary
+    # Optional: Custom query
+    # query: |
+    #   SELECT Policy_Num, Claim_Num, Product, Claim_Status, Company, Issue_State, Resident_State
+    #   FROM <your_schedule2_table_name>
+    #   WHERE Schedule_ID = '2-004'
+  
+  # 2-005: Detail records + Issue State/Resident State summaries
+  2-005:
+    table_name: <your_schedule2_table_name>
+    template_type: direct_dump_state_summary
+    # Optional: Custom query
+    # query: |
+    #   SELECT Policy_Num, Claim_Num, Product, Claim_Status, Company, Issue_State, Resident_State
+    #   FROM <your_schedule2_table_name>
+    #   WHERE Schedule_ID = '2-005'
+  
+  # Schedule 3 Worksheets
+  
+  # 3-001: Detail records + TAT summary (with % of Total)
+  3-001:
+    table_name: <your_schedule3_table_name>
+    template_type: direct_dump_tat_summary
+    # Optional: Custom query (must include TAT_in_Days column)
+    # query: |
+    #   SELECT Inq_Date, Stat_Start_Date, Decision, Decision_Reason, Company, Issue_State, Resident_State, Product, Date_of_Loss, Schedule_ID, TAT_in_Days
+    #   FROM <your_schedule3_table_name>
+    #   WHERE Schedule_ID = '3-001'
+  
+  # 3-003: Detail records only (no summaries)
+  3-003:
+    table_name: <your_schedule3_table_name>
+    template_type: direct_dump
+    # Optional: Custom query
+    # query: |
+    #   SELECT Decision_Date, Inq_Date, Stat_Start_Date, Decision, Decision_Reason, Company, Issue_State, Resident_State, Product, Date_of_Loss, Schedule_ID, TAT_in_Days
+    #   FROM <your_schedule3_table_name>
+    #   WHERE Schedule_ID = '3-003'
+  
+  # 3-004: Detail records only (no summaries)
+  3-004:
+    table_name: <your_schedule3_table_name>
+    template_type: direct_dump
+    # Optional: Custom query
+    # query: |
+    #   SELECT Decision_Date, Inq_Date, Stat_Start_Date, Decision, Decision_Reason, Company, Issue_State, Resident_State, Product, Date_of_Loss, Schedule_ID, TAT_in_Days
+    #   FROM <your_schedule3_table_name>
+    #   WHERE Schedule_ID = '3-004'
+  
+  # 3-005: Detail records only (no summaries)
+  3-005:
+    table_name: <your_schedule3_table_name>
+    template_type: direct_dump
+    # Optional: Custom query
+    # query: |
+    #   SELECT Decision_Date, Inq_Date, Stat_Start_Date, Decision, Decision_Reason, Company, Issue_State, Resident_State, Product, Date_of_Loss, Schedule_ID, TAT_in_Days
+    #   FROM <your_schedule3_table_name>
+    #   WHERE Schedule_ID = '3-005'
+  
+  # 3-006: Detail records only (no summaries)
+  3-006:
+    table_name: <your_schedule3_table_name>
+    template_type: direct_dump
+    # Optional: Custom query
+    # query: |
+    #   SELECT Inq_Date, Stat_Start_Date, Decision, Decision_Reason, Company, Issue_State, Resident_State, Product, Date_of_Loss, Schedule_ID, TAT_in_Days
+    #   FROM <your_schedule3_table_name>
+    #   WHERE Schedule_ID = '3-006'
+  
+  # 3-007: Detail records only (no summaries)
+  3-007:
+    table_name: <your_schedule3_table_name>
+    template_type: direct_dump
+    # Optional: Custom query
+    # query: |
+    #   SELECT Policy, Claim_Number, Decision_Date, Inq_Date, Stat_Start_Date, Decision, Decision_Reason, Company, Issue_State, Resident_State, Product, Date_of_Loss, Schedule_ID_2
+    #   FROM <your_schedule3_table_name>
+    #   WHERE Schedule_ID = '3-007'
