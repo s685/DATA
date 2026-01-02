@@ -17,8 +17,33 @@ snowflake:
   authenticator: externalbrowser  # 'externalbrowser' for SSO or 'snowflake' for username/password - or set SNOWFLAKE_AUTHENTICATOR env var
 
 # Summary Worksheet Configuration
+# You can use two formats:
+#
+# Format 1 (Simple - uses default query):
+#   summary:
+#     table_name: <summary_table_name>
+#     schedule_titles: {...}
+#
+# Format 2 (Advanced - custom query):
+#   summary:
+#     table_name: <summary_table_name>  # Required for validation, but query overrides default
+#     query: |  # Optional custom SQL query (if provided, used directly)
+#       SELECT Schedule_ID, Description, Value
+#       FROM <summary_table_name>
+#       WHERE Status = 'Active'
+#         AND Year = 2024
+#       ORDER BY Schedule_ID
+#     filter: "Status = 'Active' AND Year = 2024"  # Optional WHERE clause (only used if query is not provided)
+#     schedule_titles: {...}
+#
 summary:
   table_name: <summary_table_name>  # Table with Schedule_ID, Description, Value columns
+  # query: |  # Optional: Custom SQL query (if provided, used directly instead of default)
+  #   SELECT Schedule_ID, Description, Value
+  #   FROM <summary_table_name>
+  #   WHERE <your_conditions>
+  #   ORDER BY Schedule_ID
+  # filter: "Status = 'Active'"  # Optional: WHERE clause filter (only used if query is not provided)
   schedule_titles:
     1: "Schedule 1 - General Information"
     2: "Schedule 2 - Claimants"

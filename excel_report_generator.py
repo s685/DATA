@@ -1498,15 +1498,40 @@ def create_workbook(connection: snowflake.connector.SnowflakeConnection,
     wb.remove(wb.active)  # Remove default sheet
     
     # Process Summary worksheet FIRST - query from summary table
-    if summary_config and summary_config.get('table_name'):
-        summary_table_name = summary_config['table_name']
+    if summary_config and (summary_config.get('table_name') or summary_config.get('query')):
+        summary_table_name = summary_config.get('table_name', '')
         schedule_titles = summary_config.get('schedule_titles', {})
         
-        print(f"Processing Summary worksheet from table: {summary_table_name}")
-        # Basic table name validation (alphanumeric, underscore, dot for schema.table)
-        if not all(c.isalnum() or c in ('_', '.') for c in summary_table_name):
-            raise ValueError(f"Invalid table name format: {summary_table_name}")
-        query = f"SELECT Schedule_ID, Description, Value FROM {summary_table_name} ORDER BY Schedule_ID"
+        if summary_table_name:
+            print(f"Processing Summary worksheet from table: {summary_table_name}")
+        else:
+            print(f"Processing Summary worksheet with custom query")
+        
+        # Check if custom query is provided
+        custom_query = summary_config.get('query')
+        filter_clause = summary_config.get('filter') or summary_config.get('where') or summary_config.get('where_clause')
+        
+        if custom_query:
+            # Use custom query directly (supports multi-line SQL)
+            query = custom_query.strip()
+            print(f"  Using custom query for Summary worksheet")
+        else:
+            # Generate default query (requires table_name)
+            if not summary_table_name:
+                raise ValueError("Summary configuration requires either 'query' or 'table_name'")
+            
+            # Basic table name validation (alphanumeric, underscore, dot for schema.table)
+            if not all(c.isalnum() or c in ('_', '.') for c in summary_table_name):
+                raise ValueError(f"Invalid table name format: {summary_table_name}")
+            
+            # Build WHERE clause if filter is provided
+            if filter_clause:
+                where_clause = f"WHERE {filter_clause}"
+            else:
+                where_clause = ""
+            
+            query = f"SELECT Schedule_ID, Description, Value FROM {summary_table_name} {where_clause} ORDER BY Schedule_ID"
+        
         summary_data = execute_query(connection, query)
         print(f"  Fetched {len(summary_data)} summary records")
         
