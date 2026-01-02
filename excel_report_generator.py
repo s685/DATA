@@ -735,36 +735,10 @@ def get_hardcoded_worksheet_structure(worksheet_name: str, table_name: str) -> O
             formatting=FormattingConfig(header_row=1, filters=True)
         )
     
-    # Worksheet 6-001 - Summary only (no detail records): Like 5-002 (Issue State, Count, Company & Resident State, Count, Company)
+    # Worksheet 6-001 - Now uses template-based approach (state_summary_with_company)
+    # Hardcoded structure removed to avoid conflicts - use template_type in config.yaml
     elif worksheet_name == '6-001':
-        return WorksheetConfig(
-            name='6-001',
-            query=f"SELECT Issue_State, Resident_State, Company, Count FROM {table_name} WHERE Schedule_ID = '6-001'",
-            detail_start_column='A',
-            detail_columns=None,  # No detail columns - summary only
-            spacing_columns=[],  # No detail records, so no spacing needed
-            summary_config=[
-                SummaryConfig(
-                    group_by='Issue_State',
-                    aggregates=[
-                        AggregateConfig(field='Count', function='SUM', label='Count'),
-                        AggregateConfig(field='Company', function='FIRST', label='Company')  # Display company name (first value)
-                    ],
-                    start_column='A',  # Issue State: A-B-C
-                    columns=['Issue State', 'Count', 'Company']
-                ),
-                SummaryConfig(
-                    group_by='Resident_State',
-                    aggregates=[
-                        AggregateConfig(field='Count', function='SUM', label='Count'),
-                        AggregateConfig(field='Company', function='FIRST', label='Company')  # Display company name (first value)
-                    ],
-                    start_column='E',  # Gap D, Resident State: E-F-G
-                    columns=['Resident State', 'Count', 'Company']
-                )
-            ],
-            formatting=FormattingConfig(header_row=1, filters=False)  # No filters for summary-only
-        )
+        return None  # Use template-based approach instead
     
     # Worksheet 6-002 - Detail records + Issue State/Resident State summaries (Count, not CountOfPolicy No)
     elif worksheet_name == '6-002':
