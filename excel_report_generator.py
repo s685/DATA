@@ -1235,7 +1235,11 @@ def process_worksheet_data(connection: snowflake.connector.SnowflakeConnection,
     if worksheet_config.summary_config:
         for sum_config in worksheet_config.summary_config:
             # Include Grand Total for Schedule 1 worksheets (1-001, 1-004, 1-006)
+            # Also include for direct_dump_state_summary worksheets (Schedule 2, etc.)
             include_grand_total = worksheet_config.name in ['1-001', '1-004', '1-006']
+            # For state summaries (Issue_State, Resident_State), also include grand total
+            if sum_config.group_by in ['Issue_State', 'Resident_State']:
+                include_grand_total = True
             summary_data = generate_summary(detail_records, sum_config, include_grand_total=include_grand_total)
             summaries.append(summary_data)
     
