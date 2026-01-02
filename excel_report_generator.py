@@ -9,6 +9,7 @@ import argparse
 import sys
 import os
 import yaml
+import re
 from collections import defaultdict
 from dataclasses import dataclass
 from typing import List, Dict, Any, Optional, Tuple
@@ -862,9 +863,77 @@ def create_snowflake_connection(config: SnowflakeConfig) -> snowflake.connector.
         sys.exit(1)
 
 
-def execute_query(connection: snowflake.connector.SnowflakeConnection, query: str) -> List[Dict[str, Any]]:
+def resolve_table_names_in_query(query: str, database: str, schema: str) -> str:
+    """
+    Resolve unqualified table names in SQL query to database.schema.table_name format.
+    
+    Args:
+        query: SQL query string
+        database: Database name to prepend
+        schema: Schema name to prepend
+    
+    Returns:
+        Query with resolved table names
+    """
+    if not database or not schema:
+        return query  # Can't resolve without database/schema
+    
+    # Reserved SQL keywords that should not be treated as table names
+    reserved_words = {'SELECT', 'FROM', 'WHERE', 'JOIN', 'INNER', 'LEFT', 'RIGHT', 'FULL', 
+                     'OUTER', 'ON', 'ORDER', 'GROUP', 'BY', 'HAVING', 'UNION', 'INTERSECT', 
+                     'EXCEPT', 'UPDATE', 'INSERT', 'INTO', 'DELETE', 'CREATE', 'ALTER', 'DROP',
+                     'TABLE', 'VIEW', 'INDEX', 'DATABASE', 'SCHEMA', 'AS', 'AND', 'OR', 'NOT',
+                     'IN', 'EXISTS', 'LIKE', 'BETWEEN', 'IS', 'NULL', 'TRUE', 'FALSE'}
+    
+    # Pattern to match table names after FROM, JOIN, UPDATE, INSERT INTO, etc.
+    # This pattern matches unqualified identifiers (no dots, not quoted)
+    def replace_table_in_context(match):
+        full_match = match.group(0)
+        table_name = match.group(1)
+        
+        # Skip if already qualified (contains dot) - means it's schema.table or database.schema.table
+        if '.' in table_name:
+            return full_match
+        
+        # Skip if it's a reserved word
+        if table_name.upper() in reserved_words:
+            return full_match
+        
+        # Check if it's quoted (skip quoted identifiers - though pattern shouldn't match these)
+        if table_name.startswith('"') or table_name.startswith("'") or table_name.startswith('`'):
+            return full_match
+        
+        # Resolve to database.schema.table_name
+        return full_match.replace(table_name, f"{database}.{schema}.{table_name}", 1)
+    
+    # Patterns for different SQL contexts
+    # FROM table_name [alias]
+    query = re.sub(r'\bFROM\s+([a-zA-Z_][a-zA-Z0-9_]*(?:\.[a-zA-Z_][a-zA-Z0-9_]*)*)(?:\s+[a-zA-Z_][a-zA-Z0-9_]*)?\b', 
+                  replace_table_in_context, query, flags=re.IGNORECASE)
+    
+    # JOIN table_name [alias] (handles INNER JOIN, LEFT JOIN, etc.)
+    query = re.sub(r'\b(?:INNER|LEFT|RIGHT|FULL|CROSS)?\s*JOIN\s+([a-zA-Z_][a-zA-Z0-9_]*(?:\.[a-zA-Z_][a-zA-Z0-9_]*)*)(?:\s+[a-zA-Z_][a-zA-Z0-9_]*)?\b',
+                  replace_table_in_context, query, flags=re.IGNORECASE)
+    
+    # UPDATE table_name
+    query = re.sub(r'\bUPDATE\s+([a-zA-Z_][a-zA-Z0-9_]*(?:\.[a-zA-Z_][a-zA-Z0-9_]*)*)\b',
+                  replace_table_in_context, query, flags=re.IGNORECASE)
+    
+    # INSERT INTO table_name
+    query = re.sub(r'\bINSERT\s+INTO\s+([a-zA-Z_][a-zA-Z0-9_]*(?:\.[a-zA-Z_][a-zA-Z0-9_]*)*)\b',
+                  replace_table_in_context, query, flags=re.IGNORECASE)
+    
+    return query
+
+
+def execute_query(connection: snowflake.connector.SnowflakeConnection, query: str, 
+                 database: Optional[str] = None, schema: Optional[str] = None) -> List[Dict[str, Any]]:
     """Execute SQL query and return results as list of dictionaries"""
     try:
+        # Resolve table names if database and schema are provided
+        if database and schema:
+            query = resolve_table_names_in_query(query, database, schema)
+        
         cursor = connection.cursor()
         cursor.execute(query)
         
@@ -903,9 +972,10 @@ def close_connection(connection: snowflake.connector.SnowflakeConnection):
 # Data Processing Functions
 # ============================================================================
 
-def fetch_detail_records(connection: snowflake.connector.SnowflakeConnection, query: str) -> List[Dict[str, Any]]:
+def fetch_detail_records(connection: snowflake.connector.SnowflakeConnection, query: str,
+                        database: Optional[str] = None, schema: Optional[str] = None) -> List[Dict[str, Any]]:
     """Fetch detail records from Snowflake"""
-    return execute_query(connection, query)
+    return execute_query(connection, query, database, schema)
 
 
 def get_tat_range(tat_value: Any) -> str:
@@ -1039,10 +1109,11 @@ def generate_summary(detail_records: List[Dict[str, Any]], summary_config: Summa
 
 
 def process_worksheet_data(connection: snowflake.connector.SnowflakeConnection, 
-                           worksheet_config: WorksheetConfig) -> Tuple[List[Dict[str, Any]], List[List[Dict[str, Any]]]]:
+                           worksheet_config: WorksheetConfig,
+                           database: Optional[str] = None, schema: Optional[str] = None) -> Tuple[List[Dict[str, Any]], List[List[Dict[str, Any]]]]:
     """Process worksheet data: fetch details and generate summaries"""
     # Fetch detail records
-    detail_records = fetch_detail_records(connection, worksheet_config.query)
+    detail_records = fetch_detail_records(connection, worksheet_config.query, database, schema)
     
     # Generate summaries if configured
     summaries = []
@@ -1492,7 +1563,9 @@ def aggregate_all_worksheets_data(all_worksheets_data: Dict[str, Tuple[List[Dict
 def create_workbook(connection: snowflake.connector.SnowflakeConnection,
                    worksheets_config: List[WorksheetConfig],
                    summary_config: Dict[str, Any],
-                   reporting_period: Optional[str] = None) -> Workbook:
+                   reporting_period: Optional[str] = None,
+                   database: Optional[str] = None,
+                   schema: Optional[str] = None) -> Workbook:
     """Create Excel workbook with all worksheets - Summary worksheet first"""
     wb = Workbook()
     wb.remove(wb.active)  # Remove default sheet
@@ -1532,7 +1605,7 @@ def create_workbook(connection: snowflake.connector.SnowflakeConnection,
             
             query = f"SELECT Schedule_ID, Description, Value FROM {summary_table_name} {where_clause} ORDER BY Schedule_ID"
         
-        summary_data = execute_query(connection, query)
+        summary_data = execute_query(connection, query, database, schema)
         print(f"  Fetched {len(summary_data)} summary records")
         
         # Convert schedule_titles from config (may be strings like "1", "2") to integers
@@ -1548,7 +1621,7 @@ def create_workbook(connection: snowflake.connector.SnowflakeConnection,
     # Process all detail worksheets AFTER Summary
     for ws_config in worksheets_config:
         print(f"Processing worksheet: {ws_config.name}")
-        detail_records, summaries = process_worksheet_data(connection, ws_config)
+        detail_records, summaries = process_worksheet_data(connection, ws_config, database, schema)
         print(f"  Fetched {len(detail_records)} detail records")
         if summaries:
             print(f"  Generated {len(summaries)} summary table(s)")
@@ -1689,6 +1762,16 @@ def parse_config(config: Dict[str, Any]) -> Tuple[SnowflakeConfig, Dict[str, str
         else:
             print(f"Warning: Invalid format for worksheet '{worksheet_name}', skipping...")
     
+    # Build worksheet_tables mapping for backward compatibility (not used in current implementation)
+    worksheet_tables = {}
+    for ws_config in worksheets_config:
+        # Extract table name from query if possible
+        if ws_config.query:
+            # Try to extract table name from query (simple pattern matching)
+            match = re.search(r'FROM\s+([a-zA-Z_][a-zA-Z0-9_.]*)', ws_config.query, re.IGNORECASE)
+            if match:
+                worksheet_tables[ws_config.name] = match.group(1)
+    
     return snowflake_cfg, worksheet_tables, worksheets_config, summary_config
 
 
@@ -1721,6 +1804,18 @@ def main():
         required=True,
         help='Report end date (format: YYYY-MM-DD, MM/DD/YYYY, etc.)'
     )
+    parser.add_argument(
+        '--database',
+        type=str,
+        default=None,
+        help='Override database for table name resolution in queries (optional)'
+    )
+    parser.add_argument(
+        '--schema',
+        type=str,
+        default=None,
+        help='Override schema for table name resolution in queries (optional)'
+    )
     
     args = parser.parse_args()
     
@@ -1737,18 +1832,35 @@ def main():
     # Parse configuration
     snowflake_cfg, worksheet_tables, worksheets_config, summary_config = parse_config(config)
     
+    # Override database and schema for table name resolution if provided via command line
+    # Note: Connection still uses config values, but queries will resolve table names using these
+    target_database = args.database if args.database else snowflake_cfg.database
+    target_schema = args.schema if args.schema else snowflake_cfg.schema
+    
+    if args.database or args.schema:
+        print(f"Using command-line overrides for table name resolution:")
+        if args.database:
+            print(f"  Database: {target_database} (overridden from command line)")
+        else:
+            print(f"  Database: {target_database} (from config)")
+        if args.schema:
+            print(f"  Schema: {target_schema} (overridden from command line)")
+        else:
+            print(f"  Schema: {target_schema} (from config)")
+    
     print(f"Found {len(worksheets_config)} detail worksheet(s) to process")
     if summary_config.get('table_name'):
         print(f"Summary worksheet will use table: {summary_config['table_name']}")
     
-    # Create Snowflake connection
+    # Create Snowflake connection (uses config values for connection)
     print("Connecting to Snowflake...")
     connection = create_snowflake_connection(snowflake_cfg)
     
     try:
-        # Generate workbook
+        # Generate workbook (uses target_database/target_schema for table name resolution)
         print("Generating Excel workbook...")
-        wb = create_workbook(connection, worksheets_config, summary_config, reporting_period)
+        wb = create_workbook(connection, worksheets_config, summary_config, reporting_period,
+                           database=target_database, schema=target_schema)
         
         # Save workbook
         print(f"Saving workbook to: {args.output}")

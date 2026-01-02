@@ -39,6 +39,8 @@ snowflake:
 summary:
   table_name: <summary_table_name>  # Table with Schedule_ID, Description, Value columns
   # query: |  # Optional: Custom SQL query (if provided, used directly instead of default)
+  #   # NOTE: Table names are automatically resolved to database.schema.table_name
+  #   # Use just the table name (e.g., "my_table") and it becomes "database.schema.my_table"
   #   SELECT Schedule_ID, Description, Value
   #   FROM <summary_table_name>
   #   WHERE <your_conditions>
@@ -83,6 +85,9 @@ summary:
 #     template_type: direct_dump
 #
 #   # Direct dump with custom multi-line SQL query
+#   # NOTE: Table names in queries are automatically resolved to database.schema.table_name
+#   # You can use just the table name (e.g., "my_table") and it will become "database.schema.my_table"
+#   # If you need a fully qualified name, use it directly (e.g., "other_db.other_schema.table")
 #   1-004:
 #     table_name: my_table_1_004
 #     template_type: direct_dump
