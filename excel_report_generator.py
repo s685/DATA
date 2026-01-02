@@ -1345,7 +1345,7 @@ def format_date_for_reporting_period(date_str: str) -> str:
 
 def create_summary_worksheet(wb, summary_data, schedule_titles=None, reporting_period=None):
     """
-    Create Summary worksheet with all 6 schedules, Data Source column, proper spacing
+    Create Summary worksheet with all 6 schedules, proper spacing
     summary_data: List of dicts with keys: Schedule_ID, Description, Value
     schedule_titles: Dict mapping schedule number to title
     reporting_period: String like "January 1, 2024 through December 31, 2024" or None to use default
@@ -1475,7 +1475,7 @@ def create_summary_worksheet(wb, summary_data, schedule_titles=None, reporting_p
         title_cell.font = bold_font
         title_cell.alignment = Alignment(horizontal='left', vertical='top')
         
-        # Write headers - Column A: ID, Column C: Description (B is gap), Column E: Value (D is gap), Column F: Data Source
+        # Write headers - Column A: ID, Column C: Description (B is gap), Column E: Value (D is gap)
         header_row = title_row + 1
         id_header = ws.cell(row=header_row, column=1)
         id_header.value = "ID"
@@ -1494,12 +1494,6 @@ def create_summary_worksheet(wb, summary_data, schedule_titles=None, reporting_p
         value_header.font = bold_font
         value_header.alignment = Alignment(horizontal='right', vertical='top')
         apply_border(ws, header_row, 5)
-        
-        datasource_header = ws.cell(row=header_row, column=6)  # Column F: Data Source
-        datasource_header.value = "Data Source"
-        datasource_header.font = bold_font
-        datasource_header.alignment = Alignment(horizontal='left', vertical='top')
-        apply_border(ws, header_row, 6)
         
         # Write data rows - 1 row after headers
         data_start_row = header_row + 1
@@ -1547,13 +1541,6 @@ def create_summary_worksheet(wb, summary_data, schedule_titles=None, reporting_p
             value_cell.alignment = Alignment(horizontal='right', vertical='top')
             apply_border(ws, row_num, 5)
             apply_highlight(ws, row_num, 5)  # Yellow highlight
-            
-            # Column F: Data Source - always "Snowflake"
-            datasource_cell = ws.cell(row=row_num, column=6)
-            datasource_cell.value = "Snowflake"
-            datasource_cell.font = default_font
-            datasource_cell.alignment = Alignment(horizontal='left', vertical='top')
-            apply_border(ws, row_num, 6)
         
         # Move to next schedule section - leave 1 empty row between schedules
         current_row = data_start_row + len(rows) + 2  # +2 for empty row gap
@@ -1564,7 +1551,6 @@ def create_summary_worksheet(wb, summary_data, schedule_titles=None, reporting_p
     ws.column_dimensions['C'].width = 70  # Description column
     ws.column_dimensions['D'].width = 3   # Gap column (narrow)
     ws.column_dimensions['E'].width = 18  # Value column
-    ws.column_dimensions['F'].width = 20  # Data Source column
     
     # Set row heights
     ws.row_dimensions[2].height = 20
