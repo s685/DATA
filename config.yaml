@@ -243,13 +243,16 @@ worksheets:
     table_name: <your_schedule6_table_name>
     template_type: direct_dump_state_payreq_summary
     # Custom query required - include all detail columns you want to display + grouping columns
-    # IMPORTANT: Must include columns for grouping: Issue_State (or Issue_St), Resident_State (or Resident_St), Year_Pay_Req_Received
-    # If you get "invalid identifier" errors, check your actual column names in the table
-    # Common variations: Issue_St vs Issue_State, Resident_St vs Resident_State
+    # IMPORTANT: Must include columns for grouping: Issue_State, Resident_State, Year_Pay_Req_Received
+    # If your table uses shortened names (e.g., Resident_St), use column aliases:
+    #   SELECT ..., Resident_St AS Resident_State, ...
+    # The grouping logic will work with the alias name.
     # Example (adjust column names to match your actual table column names):
     query: |
       SELECT Policy, doc_id, Product, Claim_Status, Company, Issue_State, Resident_State, Year_Pay_Req_Received
       FROM <your_schedule6_table_name>
       WHERE Schedule_ID = '6-004'
-    # NOTE: If your table uses different column names (e.g., Resident_St instead of Resident_State),
-    # update the query above to use your actual column names. The grouping will work with variations.
+    # If you get "invalid identifier Resident_State" error:
+    # 1. Check your actual column name in the table (might be Resident_St, resident_state, etc.)
+    # 2. Use an alias in the SELECT: Resident_St AS Resident_State
+    # 3. Or update the query to use the actual column name and the grouping will handle it
