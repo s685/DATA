@@ -87,6 +87,244 @@ class WorksheetConfig:
 
 
 # ============================================================================
+# Template Type Configuration Functions
+# ============================================================================
+
+def create_summary_config_from_template_type(template_type: str, detail_columns_count: int = 7) -> List[SummaryConfig]:
+    """
+    Create summary configuration based on template type.
+    
+    Template types:
+    - 'direct_dump': No summaries
+    - 'direct_dump_state_summary': Detail + Issue State + Resident State summaries
+    - 'direct_dump_tat_summary': Detail + TAT summary
+    - 'direct_dump_state_tat_summary': Detail + Issue State + Resident State + TAT summaries
+    - 'state_summary_only': Only summaries (Issue State + Resident State), no detail
+    - 'direct_dump_state_payreq_summary': Detail + Issue State + Resident State + Year Pay Req Received summaries
+    
+    Args:
+        template_type: Type of template
+        detail_columns_count: Number of detail columns (for spacing calculation)
+    
+    Returns:
+        List of SummaryConfig objects
+    """
+    summary_configs = []
+    
+    if template_type == 'direct_dump':
+        return None  # No summaries
+    
+    elif template_type == 'direct_dump_state_summary':
+        # Detail + Issue State + Resident State summaries
+        # Calculate spacing: detail ends at column (detail_columns_count), gap at (detail_columns_count + 1)
+        detail_end_col = chr(ord('A') + detail_columns_count - 1)  # e.g., 'G' for 7 columns
+        gap_col = chr(ord('A') + detail_columns_count)  # e.g., 'H'
+        issue_start = chr(ord('A') + detail_columns_count + 1)  # e.g., 'I'
+        issue_end = chr(ord('A') + detail_columns_count + 2)  # e.g., 'J'
+        resident_gap = chr(ord('A') + detail_columns_count + 3)  # e.g., 'K'
+        resident_start = chr(ord('A') + detail_columns_count + 4)  # e.g., 'L'
+        
+        summary_configs = [
+            SummaryConfig(
+                group_by='Issue_State',
+                aggregates=[AggregateConfig(field='Policy_Num', function='COUNT', label='Count')],
+                start_column=issue_start,
+                columns=['Issue State', 'Count']
+            ),
+            SummaryConfig(
+                group_by='Resident_State',
+                aggregates=[AggregateConfig(field='Policy_Num', function='COUNT', label='Count')],
+                start_column=resident_start,
+                columns=['Resident State', 'Count']
+            )
+        ]
+    
+    elif template_type == 'direct_dump_tat_summary':
+        # Detail + TAT summary
+        detail_end_col = chr(ord('A') + detail_columns_count - 1)
+        gap_col = chr(ord('A') + detail_columns_count)
+        tat_start = chr(ord('A') + detail_columns_count + 1)
+        
+        summary_configs = [
+            SummaryConfig(
+                group_by='TAT_Range',
+                aggregates=[AggregateConfig(field='TAT_in_Days', function='COUNT', label='TAT COUNTS')],
+                start_column=tat_start,
+                columns=['', 'TAT COUNTS', '% of Total']
+            )
+        ]
+    
+    elif template_type == 'direct_dump_state_tat_summary':
+        # Detail + Issue State + Resident State + TAT summaries
+        detail_end_col = chr(ord('A') + detail_columns_count - 1)
+        gap_col = chr(ord('A') + detail_columns_count)
+        tat_start = chr(ord('A') + detail_columns_count + 1)
+        tat_end = chr(ord('A') + detail_columns_count + 3)
+        issue_gap = chr(ord('A') + detail_columns_count + 4)
+        issue_start = chr(ord('A') + detail_columns_count + 5)
+        issue_end = chr(ord('A') + detail_columns_count + 6)
+        resident_gap = chr(ord('A') + detail_columns_count + 7)
+        resident_start = chr(ord('A') + detail_columns_count + 8)
+        
+        summary_configs = [
+            SummaryConfig(
+                group_by='TAT_Range',
+                aggregates=[AggregateConfig(field='TAT_in_Days', function='COUNT', label='TAT COUNTS')],
+                start_column=tat_start,
+                columns=['', 'TAT COUNTS', '% of Total']
+            ),
+            SummaryConfig(
+                group_by='Issue_State',
+                aggregates=[AggregateConfig(field='Policy_Num', function='COUNT', label='CountOfPolicy No')],
+                start_column=issue_start,
+                columns=['Issue State', 'CountOfPolicy No']
+            ),
+            SummaryConfig(
+                group_by='Resident_State',
+                aggregates=[AggregateConfig(field='Policy_Num', function='COUNT', label='CountOfPolicy No')],
+                start_column=resident_start,
+                columns=['Resident State', 'CountOfPolicy No']
+            )
+        ]
+    
+    elif template_type == 'state_summary_only':
+        # Only summaries, no detail
+        summary_configs = [
+            SummaryConfig(
+                group_by='Issue_State',
+                aggregates=[AggregateConfig(field='Policy_Num', function='COUNT', label='CountOfPolicy No')],
+                start_column='A',
+                columns=['Issue State', 'CountOfPolicy No']
+            ),
+            SummaryConfig(
+                group_by='Resident_State',
+                aggregates=[AggregateConfig(field='Policy_Num', function='COUNT', label='CountOfPolicy No')],
+                start_column='D',  # Gap at C
+                columns=['Resident State', 'CountOfPolicy No']
+            )
+        ]
+    
+    elif template_type == 'direct_dump_state_payreq_summary':
+        # Detail + Issue State + Resident State + Year Pay Req Received summaries
+        detail_end_col = chr(ord('A') + detail_columns_count - 1)
+        gap_col = chr(ord('A') + detail_columns_count)
+        issue_start = chr(ord('A') + detail_columns_count + 1)
+        issue_end = chr(ord('A') + detail_columns_count + 2)
+        resident_gap = chr(ord('A') + detail_columns_count + 3)
+        resident_start = chr(ord('A') + detail_columns_count + 4)
+        resident_end = chr(ord('A') + detail_columns_count + 5)
+        payreq_gap = chr(ord('A') + detail_columns_count + 6)
+        payreq_start = chr(ord('A') + detail_columns_count + 7)
+        
+        summary_configs = [
+            SummaryConfig(
+                group_by='Issue_State',
+                aggregates=[AggregateConfig(field='Policy_Num', function='COUNT', label='Count')],
+                start_column=issue_start,
+                columns=['Issue State', 'Count']
+            ),
+            SummaryConfig(
+                group_by='Resident_State',
+                aggregates=[AggregateConfig(field='Policy_Num', function='COUNT', label='Count')],
+                start_column=resident_start,
+                columns=['Resident State', 'Count']
+            ),
+            SummaryConfig(
+                group_by='Year_Pay_Req_Received',
+                aggregates=[AggregateConfig(field='Policy_Num', function='COUNT', label='Counts')],
+                start_column=payreq_start,
+                columns=['Year Pay Req Received', 'Counts']
+            )
+        ]
+    
+    else:
+        raise ValueError(f"Unknown template type: {template_type}. Valid types: direct_dump, direct_dump_state_summary, direct_dump_tat_summary, direct_dump_state_tat_summary, state_summary_only, direct_dump_state_payreq_summary")
+    
+    return summary_configs
+
+
+def create_worksheet_config_from_template(worksheet_name: str, table_name: str, template_type: str, 
+                                         query: Optional[str] = None, detail_columns: Optional[List[str]] = None,
+                                         filter_clause: Optional[str] = None) -> WorksheetConfig:
+    """
+    Create worksheet configuration from template type.
+    
+    Args:
+        worksheet_name: Name of the worksheet
+        table_name: Snowflake table name (used only if query is not provided)
+        template_type: Type of template (see create_summary_config_from_template_type)
+        query: Optional custom SQL query (if provided, used directly; if not, generates default)
+        detail_columns: Optional list of detail column names (if not provided, uses actual columns from query)
+        filter_clause: Optional WHERE clause filter (e.g., "Schedule_ID = '1-001' AND Status = 'Active'")
+                      Only used if query is not provided
+    
+    Returns:
+        WorksheetConfig object
+    """
+    # If custom query is provided, use it directly (supports multi-line SQL)
+    if query:
+        # Clean up query - remove leading/trailing whitespace, normalize newlines
+        query = query.strip()
+        # Use the provided query as-is
+        pass
+    else:
+        # Generate default query if not provided
+        # Build WHERE clause
+        if filter_clause:
+            where_clause = f"WHERE {filter_clause}"
+        else:
+            where_clause = f"WHERE Schedule_ID = '{worksheet_name}'"
+        
+        if template_type == 'state_summary_only':
+            # For summary-only, we still need a query to get data for summaries
+            query = f"SELECT Policy_Num, Issue_State, Resident_State FROM {table_name} {where_clause}"
+        elif 'tat' in template_type.lower():
+            # Include TAT_in_Days for TAT summaries
+            query = f"SELECT Policy_Num, Claim_Num, Product, Claim_Status, Company, Issue_State, Resident_State, TAT_in_Days FROM {table_name} {where_clause}"
+        elif 'payreq' in template_type.lower():
+            # Include Year_Pay_Req_Received for pay req summaries
+            query = f"SELECT Policy_Num, Claim_Num, Product, Claim_Status, Company, Issue_State, Resident_State, Year_Pay_Req_Received FROM {table_name} {where_clause}"
+        else:
+            # Default query for state summaries or direct dump
+            query = f"SELECT Policy_Num, Claim_Num, Product, Claim_Status, Company, Issue_State, Resident_State FROM {table_name} {where_clause}"
+    
+    # Calculate detail columns count for spacing
+    if detail_columns:
+        detail_columns_count = len(detail_columns)
+    elif template_type == 'state_summary_only':
+        detail_columns_count = 0  # No detail columns
+    else:
+        # Estimate from query - count SELECT columns
+        select_part = query.split('FROM')[0].replace('SELECT', '').strip()
+        detail_columns_count = len([c.strip() for c in select_part.split(',')])
+    
+    # Create summary config based on template type
+    summary_config = create_summary_config_from_template_type(template_type, detail_columns_count)
+    
+    # Determine spacing columns
+    if template_type == 'state_summary_only':
+        spacing_columns = []  # No detail, so no spacing needed
+    elif summary_config is None:
+        spacing_columns = []  # No summaries, so no spacing needed
+    else:
+        # Add one column gap between detail and summaries
+        spacing_columns = [chr(ord('A') + detail_columns_count)]
+    
+    # Determine if filters should be enabled
+    filters_enabled = template_type != 'state_summary_only'
+    
+    return WorksheetConfig(
+        name=worksheet_name,
+        query=query,
+        detail_start_column='A',
+        detail_columns=detail_columns,  # None means use actual column names from query
+        spacing_columns=spacing_columns,
+        summary_config=summary_config,
+        formatting=FormattingConfig(header_row=1, filters=filters_enabled)
+    )
+
+
+# ============================================================================
 # Hardcoded Worksheet Definitions (Structure only - table names come from config)
 # ============================================================================
 
@@ -1366,20 +1604,65 @@ def parse_config(config: Dict[str, Any]) -> Tuple[SnowflakeConfig, Dict[str, str
         authenticator=authenticator
     )
     
-    # Get worksheet to table mapping (exclude Summary if present)
-    worksheet_tables = {k: v for k, v in config.get('worksheets', {}).items() if k != 'Summary'}
+    # Get worksheet configuration (can be string table_name or dict with table_name and template_type)
+    worksheet_configs_raw = config.get('worksheets', {})
+    worksheet_configs_raw = {k: v for k, v in worksheet_configs_raw.items() if k != 'Summary'}
     
     # Get summary configuration
     summary_config = config.get('summary', {})
     
-    # Build worksheet configs using hardcoded structures
+    # Build worksheet configs
     worksheets_config = []
-    for worksheet_name, table_name in worksheet_tables.items():
-        ws_config = get_hardcoded_worksheet_structure(worksheet_name, table_name)
-        if ws_config:
-            worksheets_config.append(ws_config)
+    for worksheet_name, worksheet_data in worksheet_configs_raw.items():
+        # Support both formats:
+        # 1. Simple: "1-001: table_name" (uses hardcoded structure)
+        # 2. Advanced: "1-001: {table_name: 'table', template_type: 'direct_dump_state_summary'}" (uses template type)
+        if isinstance(worksheet_data, str):
+            # Simple format - use hardcoded structure
+            table_name = worksheet_data
+            ws_config = get_hardcoded_worksheet_structure(worksheet_name, table_name)
+            if ws_config:
+                worksheets_config.append(ws_config)
+            else:
+                print(f"Warning: Unknown worksheet name '{worksheet_name}', skipping...")
+        elif isinstance(worksheet_data, dict) and 'table_name' not in worksheet_data and 'table' not in worksheet_data:
+            # Simple format with just table name as dict value (backward compatibility)
+            table_name = worksheet_data.get('table_name') or worksheet_data.get('table') or str(worksheet_data)
+            ws_config = get_hardcoded_worksheet_structure(worksheet_name, table_name)
+            if ws_config:
+                worksheets_config.append(ws_config)
+            else:
+                print(f"Warning: Unknown worksheet name '{worksheet_name}', skipping...")
+        elif isinstance(worksheet_data, dict):
+            # Advanced format - use template type
+            table_name = worksheet_data.get('table_name') or worksheet_data.get('table')
+            template_type = worksheet_data.get('template_type')
+            query = worksheet_data.get('query')
+            detail_columns = worksheet_data.get('detail_columns')
+            filter_clause = worksheet_data.get('filter') or worksheet_data.get('where') or worksheet_data.get('where_clause')
+            
+            if not table_name:
+                print(f"Warning: Worksheet '{worksheet_name}' missing table_name, skipping...")
+                continue
+            
+            if not template_type:
+                print(f"Warning: Worksheet '{worksheet_name}' missing template_type, using hardcoded structure...")
+                ws_config = get_hardcoded_worksheet_structure(worksheet_name, table_name)
+            else:
+                # Use template type to create config
+                try:
+                    ws_config = create_worksheet_config_from_template(
+                        worksheet_name, table_name, template_type, query, detail_columns, filter_clause
+                    )
+                except ValueError as e:
+                    print(f"Error: {e}")
+                    print(f"  Falling back to hardcoded structure for '{worksheet_name}'...")
+                    ws_config = get_hardcoded_worksheet_structure(worksheet_name, table_name)
+            
+            if ws_config:
+                worksheets_config.append(ws_config)
         else:
-            print(f"Warning: Unknown worksheet name '{worksheet_name}', skipping...")
+            print(f"Warning: Invalid format for worksheet '{worksheet_name}', skipping...")
     
     return snowflake_cfg, worksheet_tables, worksheets_config, summary_config
 

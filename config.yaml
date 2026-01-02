@@ -27,10 +27,94 @@ summary:
     5: "Schedule 5"  # Update with actual title when available
     6: "Schedule 6"  # Update with actual title when available
 
-# Worksheet to Table Mapping for Detail Worksheets
-# Each worksheet name maps to its corresponding Snowflake table name
-# All column structures, summaries, and formatting are hardcoded in Python based on template images
+# Worksheet Configuration
+# You can use two formats:
+#
+# Format 1 (Simple - uses hardcoded structure):
+#   worksheet_name: table_name
+#
+# Format 2 (Advanced - configurable template type):
+#   worksheet_name:
+#     table_name: <table_name>
+#     template_type: <template_type>
+#     query: <optional_custom_query>
+#     detail_columns: <optional_list_of_column_names>
+#
+# Available template types:
+#   - 'direct_dump': Detail records only, no summaries
+#   - 'direct_dump_state_summary': Detail + Issue State + Resident State summaries
+#   - 'direct_dump_tat_summary': Detail + TAT summary (with % of Total)
+#   - 'direct_dump_state_tat_summary': Detail + Issue State + Resident State + TAT summaries
+#   - 'state_summary_only': Only summaries (Issue State + Resident State), no detail records
+#   - 'direct_dump_state_payreq_summary': Detail + Issue State + Resident State + Year Pay Req Received summaries
+#
+# Examples:
+#   # Simple format (uses hardcoded structure)
+#   1-001: my_table_1_001
+#
+#   # Advanced format with template type
+#   1-004:
+#     table_name: my_table_1_004
+#     template_type: direct_dump
+#
+#   # Direct dump with custom multi-line SQL query
+#   1-004:
+#     table_name: my_table_1_004
+#     template_type: direct_dump
+#     query: |
+#       SELECT 
+#         Policy_Num,
+#         Claim_Num,
+#         Product,
+#         Claim_Status,
+#         Company,
+#         Issue_State,
+#         Resident_State
+#       FROM my_table_1_004
+#       WHERE Schedule_ID = '1-004'
+#         AND Status = 'Active'
+#         AND Year = 2024
+#       ORDER BY Policy_Num
+#
+#   # Direct dump with complex multi-line SQL query
+#   3-003:
+#     table_name: my_table_3_003
+#     template_type: direct_dump
+#     query: |
+#       SELECT 
+#         Decision_Date,
+#         Inq_Date,
+#         Stat_Start_Date,
+#         Decision,
+#         Decision_Reason,
+#         Company,
+#         Issue_State,
+#         Resident_State,
+#         Product,
+#         Date_of_Loss
+#       FROM my_table_3_003
+#       WHERE Schedule_ID = '3-003'
+#         AND Decision_Date >= '2024-01-01'
+#         AND Decision_Date <= '2024-12-31'
+#         AND Status = 'Active'
+#       ORDER BY Decision_Date DESC
+#
+#   # Direct dump with filter (uses default query generation)
+#   1-004:
+#     table_name: my_table_1_004
+#     template_type: direct_dump
+#     filter: "Schedule_ID = '1-004' AND Status = 'Active' AND Year = 2024"
+#
+#   2-001:
+#     table_name: my_table_2_001
+#     template_type: direct_dump_state_summary
+#
+#   2-003:
+#     table_name: my_table_2_003
+#     template_type: direct_dump_tat_summary
+#
 worksheets:
+  # Simple format (backward compatible)
   1-001: <table_name_1_001>
   1-004: <table_name_1_004>
   1-006: <table_name_1_006>
@@ -53,3 +137,28 @@ worksheets:
   6-002: <table_name_6_002>
   6-003: <table_name_6_003>
   6-004: <table_name_6_004>
+  
+  # Advanced format examples (uncomment and customize as needed):
+  # 1-004:
+  #   table_name: <table_name_1_004>
+  #   template_type: direct_dump
+  #
+  # 2-001:
+  #   table_name: <table_name_2_001>
+  #   template_type: direct_dump_state_summary
+  #
+  # 2-003:
+  #   table_name: <table_name_2_003>
+  #   template_type: direct_dump_tat_summary
+  #
+  # 5-003:
+  #   table_name: <table_name_5_003>
+  #   template_type: direct_dump_state_tat_summary
+  #
+  # 1-001:
+  #   table_name: <table_name_1_001>
+  #   template_type: state_summary_only
+  #
+  # 6-004:
+  #   table_name: <table_name_6_004>
+  #   template_type: direct_dump_state_payreq_summary
