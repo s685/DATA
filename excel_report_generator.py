@@ -842,30 +842,34 @@ def get_hardcoded_worksheet_structure(worksheet_name: str, table_name: str) -> O
         )
     
     # Worksheet 6-004 - Same as 6-003 + Additional Summary (Counts, Year Pay Req Received)
+    # NOTE: This hardcoded structure uses generic column names. For actual use, provide a custom query
+    # with your actual column names (e.g., Policy instead of Policy_Num, doc_id, etc.)
     elif worksheet_name == '6-004':
+        # Only select grouping columns to avoid "invalid identifier" errors
+        # User should provide custom query with actual column names
         return WorksheetConfig(
             name='6-004',
-            query=f"SELECT Policy_Num, Claim_Num, Product, Claim_Status, Company, Issue_State, Resident_State, Year_Pay_Req_Received FROM {table_name} WHERE Schedule_ID = '6-004'",
+            query=f"SELECT Issue_State, Resident_State, Year_Pay_Req_Received FROM {table_name} WHERE Schedule_ID = '6-004'",
             detail_start_column='A',
             detail_columns=None,  # Use actual column names from query results
-            spacing_columns=['I'],  # One column gap between detail (A-H) and summaries
+            spacing_columns=[],  # No detail columns, so no spacing needed
             summary_config=[
                 SummaryConfig(
                     group_by='Issue_State',
                     aggregates=[AggregateConfig(field='', function='COUNT', label='Count')],  # Empty field = count records
-                    start_column='J',  # Issue State: J-K
+                    start_column='A',  # Issue State: A-B
                     columns=['Issue State', 'Count']
                 ),
                 SummaryConfig(
                     group_by='Resident_State',
                     aggregates=[AggregateConfig(field='', function='COUNT', label='Count')],  # Empty field = count records
-                    start_column='M',  # Gap L, Resident State: M-N
+                    start_column='D',  # Gap C, Resident State: D-E
                     columns=['Resident State', 'Count']
                 ),
                 SummaryConfig(
                     group_by='Year_Pay_Req_Received',  # Additional summary by Year
                     aggregates=[AggregateConfig(field='', function='COUNT', label='Counts')],  # Empty field = count records
-                    start_column='P',  # Gap O, Year summary: P-Q (Year Pay Req Received, Counts)
+                    start_column='G',  # Gap F, Year summary: G-H (Year Pay Req Received, Counts)
                     columns=['Year Pay Req Received', 'Counts']  # Year value first, then Counts
                 )
             ],
