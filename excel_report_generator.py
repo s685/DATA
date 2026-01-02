@@ -72,6 +72,7 @@ class FormattingConfig:
     filters: bool = True
     highlight_columns: List[str] = None
     highlight_cells: List[str] = None
+    currency_columns: List[str] = None  # Column names to format as currency (with $ symbol)
 
 
 @dataclass
@@ -247,7 +248,8 @@ def create_summary_config_from_template_type(template_type: str, detail_columns_
 
 def create_worksheet_config_from_template(worksheet_name: str, table_name: str, template_type: str, 
                                          query: Optional[str] = None, detail_columns: Optional[List[str]] = None,
-                                         filter_clause: Optional[str] = None) -> WorksheetConfig:
+                                         filter_clause: Optional[str] = None,
+                                         currency_columns: Optional[List[str]] = None) -> WorksheetConfig:
     """
     Create worksheet configuration from template type.
     
@@ -315,6 +317,13 @@ def create_worksheet_config_from_template(worksheet_name: str, table_name: str, 
     # Determine if filters should be enabled
     filters_enabled = template_type != 'state_summary_only'
     
+    # Create formatting config with currency columns if provided
+    formatting = FormattingConfig(
+        header_row=1, 
+        filters=filters_enabled,
+        currency_columns=currency_columns
+    )
+    
     return WorksheetConfig(
         name=worksheet_name,
         query=query,
@@ -322,7 +331,7 @@ def create_worksheet_config_from_template(worksheet_name: str, table_name: str, 
         detail_columns=detail_columns,  # None means use actual column names from query
         spacing_columns=spacing_columns,
         summary_config=summary_config,
-        formatting=FormattingConfig(header_row=1, filters=filters_enabled)
+        formatting=formatting
     )
 
 
@@ -1395,6 +1404,27 @@ def write_detail_table(ws, detail_records: List[Dict[str, Any]],
             cell.alignment = Alignment(vertical='top')
             apply_border(ws, data_start_row + row_idx, start_col_idx + col_idx)
             
+            # Apply currency formatting if configured
+            if worksheet_config.formatting and worksheet_config.formatting.currency_columns:
+                # Check if this column (by name) should be formatted as currency
+                # Support case-insensitive matching
+                should_format_currency = False
+                for currency_col in worksheet_config.formatting.currency_columns:
+                    if col_name.upper() == currency_col.upper() or actual_col.upper() == currency_col.upper():
+                        should_format_currency = True
+                        break
+                
+                if should_format_currency and value is not None and value != '':
+                    try:
+                        # Convert to float if it's a number
+                        numeric_value = float(value)
+                        # Apply currency format: $#,##0.00
+                        cell.number_format = '$#,##0.00'
+                        cell.value = numeric_value
+                    except (ValueError, TypeError):
+                        # If conversion fails, leave as is (might be a string)
+                        pass
+            
             # Apply highlighting if configured
             col_letter = index_to_column_letter(start_col_idx + col_idx)
             if worksheet_config.formatting:
@@ -2025,6 +2055,7 @@ def parse_config(config: Dict[str, Any]) -> Tuple[SnowflakeConfig, Dict[str, str
             query = worksheet_data.get('query')
             detail_columns = worksheet_data.get('detail_columns')
             filter_clause = worksheet_data.get('filter') or worksheet_data.get('where') or worksheet_data.get('where_clause')
+            currency_columns = worksheet_data.get('currency_columns')  # List of column names to format as currency
             
             if not table_name:
                 print(f"Warning: Worksheet '{worksheet_name}' missing table_name, skipping...")
@@ -2033,11 +2064,17 @@ def parse_config(config: Dict[str, Any]) -> Tuple[SnowflakeConfig, Dict[str, str
             if not template_type:
                 print(f"Warning: Worksheet '{worksheet_name}' missing template_type, using hardcoded structure...")
                 ws_config = get_hardcoded_worksheet_structure(worksheet_name, table_name)
+                # Apply currency formatting to hardcoded config if specified
+                if ws_config and currency_columns:
+                    if ws_config.formatting:
+                        ws_config.formatting.currency_columns = currency_columns
+                    else:
+                        ws_config.formatting = FormattingConfig(currency_columns=currency_columns)
             else:
                 # Use template type to create config
                 try:
                     ws_config = create_worksheet_config_from_template(
-                        worksheet_name, table_name, template_type, query, detail_columns, filter_clause
+                        worksheet_name, table_name, template_type, query, detail_columns, filter_clause, currency_columns
                     )
                 except ValueError as e:
                     print(f"Error: {e}")
