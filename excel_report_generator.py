@@ -337,6 +337,10 @@ def create_worksheet_config_from_template(worksheet_name: str, table_name: str, 
     
     # Create summary config based on template type
     summary_config = create_summary_config_from_template_type(template_type, detail_columns_count)
+    if summary_config:
+        print(f"  DEBUG: Created {len(summary_config)} summary config(s) for template '{template_type}' (detail_columns_count={detail_columns_count})")
+        for idx, sc in enumerate(summary_config):
+            print(f"    Summary config {idx+1}: group_by='{sc.group_by}', start_column='{sc.start_column}', columns={sc.columns}")
     
     # Determine spacing columns
     if template_type == 'state_summary_only':
@@ -1977,6 +1981,25 @@ def create_worksheet(wb: Workbook, worksheet_config: WorksheetConfig,
             print(f"  DEBUG: Writing {len(worksheet_config.summary_config)} summaries for worksheet '{worksheet_config.name}'")
             print(f"  DEBUG: Summary configs: {[sc.group_by for sc in worksheet_config.summary_config]}")
             print(f"  DEBUG: Summary data lengths: {[len(s) for s in summaries]}")
+            
+            # Check for duplicates in summary_config
+            seen_configs = set()
+            unique_configs = []
+            unique_summaries = []
+            for sc, sd in zip(worksheet_config.summary_config, summaries):
+                config_key = (sc.group_by, sc.start_column)
+                if config_key not in seen_configs:
+                    seen_configs.add(config_key)
+                    unique_configs.append(sc)
+                    unique_summaries.append(sd)
+                else:
+                    print(f"  WARNING: Duplicate summary config detected for group_by='{sc.group_by}', start_column='{sc.start_column}' - skipping duplicate")
+            
+            if len(unique_configs) != len(worksheet_config.summary_config):
+                print(f"  WARNING: Found {len(worksheet_config.summary_config) - len(unique_configs)} duplicate summary config(s), using only unique ones")
+                worksheet_config.summary_config = unique_configs
+                summaries = unique_summaries
+            
             for summary_config, summary_data in zip(worksheet_config.summary_config, summaries):
                 print(f"  DEBUG: Writing summary table for '{summary_config.group_by}' at column '{summary_config.start_column}', {len(summary_data)} rows")
                 write_summary_table(ws, summary_data, summary_config, start_row=header_row)
