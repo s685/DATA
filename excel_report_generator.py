@@ -1242,6 +1242,14 @@ def generate_summary(detail_records: List[Dict[str, Any]], summary_config: Summa
         else:
             summary_row = {summary_config.columns[0]: group_key}
         
+        # Debug output for state_summary_with_company template
+        if len(summary_config.aggregates) > 1 and any(agg.function.upper() in ('SUM', 'FIRST') for agg in summary_config.aggregates):
+            if records:
+                print(f"  DEBUG: Group '{group_key}' has {len(records)} records")
+                print(f"  DEBUG: First record columns: {list(records[0].keys())}")
+                for agg in summary_config.aggregates:
+                    print(f"  DEBUG: Looking for field '{agg.field}' with function '{agg.function}'")
+        
         for agg in summary_config.aggregates:
             field_value = agg.field
             function = agg.function.upper()
@@ -1287,8 +1295,32 @@ def generate_summary(detail_records: List[Dict[str, Any]], summary_config: Summa
                     for key, val in record.items():
                         if key.upper() == field_name.upper():
                             return val
+                    # Try variations
+                    variations = [
+                        field_name.replace('_', ''),
+                        field_name.lower(),
+                        field_name.upper(),
+                        field_name.replace('_', ' '),
+                    ]
+                    for var in variations:
+                        if var in record:
+                            return record[var]
                     return None
-                value = sum(float(get_field_val(r, field_value) or 0) for r in records)
+                # Sum values, handling both numeric strings and numbers
+                sum_values = []
+                for r in records:
+                    val = get_field_val(r, field_value)
+                    if val is not None and val != '':
+                        try:
+                            sum_values.append(float(val))
+                        except (ValueError, TypeError):
+                            # If conversion fails, try to extract number from string
+                            if isinstance(val, str):
+                                # Try to extract first number from string
+                                match = re.search(r'\d+\.?\d*', str(val))
+                                if match:
+                                    sum_values.append(float(match.group()))
+                value = sum(sum_values) if sum_values else 0
             elif function == 'AVG' or function == 'AVERAGE':
                 def get_field_val(record, field_name):
                     if field_name in record:
@@ -1321,6 +1353,24 @@ def generate_summary(detail_records: List[Dict[str, Any]], summary_config: Summa
                 value = max(values) if values else None
             elif function == 'FIRST' or function == 'VALUE':
                 # Get first non-null value from the field (for displaying company name, etc.)
+                # Helper for case-insensitive field access
+                def get_field_val(record, field_name):
+                    if field_name in record:
+                        return record[field_name]
+                    for key, val in record.items():
+                        if key.upper() == field_name.upper():
+                            return val
+                    # Try variations
+                    variations = [
+                        field_name.replace('_', ''),
+                        field_name.lower(),
+                        field_name.upper(),
+                        field_name.replace('_', ' '),
+                    ]
+                    for var in variations:
+                        if var in record:
+                            return record[var]
+                    return None
                 value = ''
                 for record in records:
                     val = get_field_val(record, field_value)
@@ -1331,6 +1381,10 @@ def generate_summary(detail_records: List[Dict[str, Any]], summary_config: Summa
                 value = 0
             
             summary_row[agg.label] = value
+            
+            # Debug output for state_summary_with_company
+            if len(summary_config.aggregates) > 1 and any(a.function.upper() in ('SUM', 'FIRST') for a in summary_config.aggregates):
+                print(f"  DEBUG: Aggregate '{agg.label}' (field='{field_value}', function='{function}') = {value}")
             
             # Accumulate for grand total
             if include_grand_total:
