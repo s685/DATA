@@ -947,6 +947,7 @@ def resolve_table_names_in_query(query: str, database: str, schema: str) -> str:
 def execute_query(connection: snowflake.connector.SnowflakeConnection, query: str, 
                  database: Optional[str] = None, schema: Optional[str] = None) -> List[Dict[str, Any]]:
     """Execute SQL query and return results as list of dictionaries"""
+    original_query = query
     try:
         # Resolve table names if database and schema are provided
         if database and schema:
@@ -975,8 +976,25 @@ def execute_query(connection: snowflake.connector.SnowflakeConnection, query: st
         finally:
             cursor.close()
     except Exception as e:
-        print(f"Error executing query: {e}")
-        print(f"Query: {query[:200]}...")
+        error_msg = str(e)
+        print(f"Error executing query: {error_msg}")
+        print(f"\nOriginal query:")
+        print(f"  {original_query[:500]}")
+        if query != original_query:
+            print(f"\nResolved query (after table name resolution):")
+            print(f"  {query[:500]}")
+        
+        # Provide helpful error messages for common issues
+        if 'invalid identifier' in error_msg.lower() or 'does not exist' in error_msg.lower():
+            print("\nTROUBLESHOOTING:")
+            print("Common causes:")
+            print("1. Column name doesn't exist - check spelling and case")
+            print("2. Wrong syntax in WHERE clause:")
+            print("   ❌ WHERE 'Company' = 'CCC'  (wrong - 'Company' is treated as string)")
+            print("   ✅ WHERE Company = 'CCC'     (correct - Company is column, 'CCC' is value)")
+            print("3. Table name not found - check if table exists in database.schema")
+            print("4. If using quoted identifiers, they must match exact case")
+        
         raise
 
 
@@ -1033,8 +1051,34 @@ def generate_summary(detail_records: List[Dict[str, Any]], summary_config: Summa
                 grouped[group_key].append(record)
     else:
         # Standard grouping by field value
+        # Handle case-insensitive column name matching
+        def get_field_value_case_insensitive(record, field_name):
+            """Get field value from record with case-insensitive matching"""
+            # Try exact match first
+            if field_name in record:
+                return record[field_name]
+            # Try case-insensitive match
+            for key, value in record.items():
+                if key.upper() == field_name.upper():
+                    return value
+            # Try common variations
+            variations = [
+                field_name.replace('_', ''),
+                field_name.lower(),
+                field_name.upper(),
+                field_name.replace('_', ' '),
+            ]
+            for var in variations:
+                if var in record:
+                    return record[var]
+            return None
+        
         for record in detail_records:
-            group_key = record.get(summary_config.group_by, '')
+            group_key = get_field_value_case_insensitive(record, summary_config.group_by)
+            if group_key is None:
+                group_key = ''
+            # Convert to string and handle None/empty values
+            group_key = str(group_key) if group_key is not None else ''
             grouped[group_key].append(record)
     
     # Calculate aggregates for each group
@@ -1053,6 +1097,27 @@ def generate_summary(detail_records: List[Dict[str, Any]], summary_config: Summa
     else:
         sorted_groups = sorted(grouped.items())
     
+    # Debug output for grouping issues
+    if len(grouped) == 1:
+        first_key = list(grouped.keys())[0]
+        if first_key in ('', 'None', None):
+            print(f"  WARNING: All {len(detail_records)} records grouped into single group (empty/None values)")
+            print(f"  Group by field: '{summary_config.group_by}'")
+            if detail_records:
+                print(f"  Available columns in data: {list(detail_records[0].keys())}")
+                # Try to find the field
+                sample_record = detail_records[0]
+                found_value = None
+                if summary_config.group_by in sample_record:
+                    found_value = sample_record[summary_config.group_by]
+                else:
+                    for key, val in sample_record.items():
+                        if key.upper() == summary_config.group_by.upper():
+                            found_value = val
+                            break
+                print(f"  Sample '{summary_config.group_by}' value from first record: {found_value}")
+                print(f"  This suggests the column name doesn't match. Check your query column names.")
+    
     # First pass: calculate counts and totals
     for group_key, records in sorted_groups:
         # For TAT_Range grouping, use empty string for first column (users know row position = category)
@@ -1069,15 +1134,44 @@ def generate_summary(detail_records: List[Dict[str, Any]], summary_config: Summa
                 value = len(records)
                 total_count += value  # Accumulate total for percentage
             elif function == 'SUM':
-                value = sum(float(r.get(field_value, 0) or 0) for r in records)
+                # Helper for case-insensitive field access
+                def get_field_val(record, field_name):
+                    if field_name in record:
+                        return record[field_name]
+                    for key, val in record.items():
+                        if key.upper() == field_name.upper():
+                            return val
+                    return None
+                value = sum(float(get_field_val(r, field_value) or 0) for r in records)
             elif function == 'AVG' or function == 'AVERAGE':
-                values = [float(r.get(field_value, 0) or 0) for r in records if r.get(field_value) is not None]
+                def get_field_val(record, field_name):
+                    if field_name in record:
+                        return record[field_name]
+                    for key, val in record.items():
+                        if key.upper() == field_name.upper():
+                            return val
+                    return None
+                values = [float(get_field_val(r, field_value) or 0) for r in records if get_field_val(r, field_value) is not None]
                 value = sum(values) / len(values) if values else 0
             elif function == 'MIN':
-                values = [r.get(field_value) for r in records if r.get(field_value) is not None]
+                def get_field_val(record, field_name):
+                    if field_name in record:
+                        return record[field_name]
+                    for key, val in record.items():
+                        if key.upper() == field_name.upper():
+                            return val
+                    return None
+                values = [get_field_val(r, field_value) for r in records if get_field_val(r, field_value) is not None]
                 value = min(values) if values else None
             elif function == 'MAX':
-                values = [r.get(field_value) for r in records if r.get(field_value) is not None]
+                def get_field_val(record, field_name):
+                    if field_name in record:
+                        return record[field_name]
+                    for key, val in record.items():
+                        if key.upper() == field_name.upper():
+                            return val
+                    return None
+                values = [get_field_val(r, field_value) for r in records if get_field_val(r, field_value) is not None]
                 value = max(values) if values else None
             else:
                 value = 0
