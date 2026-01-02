@@ -674,37 +674,10 @@ def get_hardcoded_worksheet_structure(worksheet_name: str, table_name: str) -> O
             formatting=FormattingConfig(header_row=1, filters=True)
         )
     
-    # Worksheet 5-002 - Summary only (no detail records): Issue State/Resident State summaries with Company
+    # Worksheet 5-002 - Now uses template-based approach (state_summary_with_company)
+    # Hardcoded structure removed to avoid conflicts - use template_type in config.yaml
     elif worksheet_name == '5-002':
-        # Summary only: Issue State, Count, Company & Resident State, Count, Company
-        return WorksheetConfig(
-            name='5-002',
-            query=f"SELECT Issue_State, Resident_State, Company, Count FROM {table_name} WHERE Schedule_ID = '5-002'",
-            detail_start_column='A',
-            detail_columns=None,  # No detail columns - summary only
-            spacing_columns=[],  # No detail records, so no spacing needed
-            summary_config=[
-                SummaryConfig(
-                    group_by='Issue_State',
-                    aggregates=[
-                        AggregateConfig(field='Count', function='SUM', label='Count'),
-                        AggregateConfig(field='Company', function='FIRST', label='Company')  # Display company name (first value)
-                    ],
-                    start_column='A',  # Issue State: A-B-C
-                    columns=['Issue State', 'Count', 'Company']
-                ),
-                SummaryConfig(
-                    group_by='Resident_State',
-                    aggregates=[
-                        AggregateConfig(field='Count', function='SUM', label='Count'),
-                        AggregateConfig(field='Company', function='FIRST', label='Company')  # Display company name (first value)
-                    ],
-                    start_column='E',  # Gap D, Resident State: E-F-G
-                    columns=['Resident State', 'Count', 'Company']
-                )
-            ],
-            formatting=FormattingConfig(header_row=1, filters=False)  # No filters for summary-only
-        )
+        return None  # Use template-based approach instead
     
     # Worksheet 5-003 - Detail records + TAT summary + Issue State/Resident State summaries
     elif worksheet_name == '5-003':
@@ -1458,11 +1431,7 @@ def generate_summary(detail_records: List[Dict[str, Any]], summary_config: Summa
         else:
             grand_total_row = {summary_config.columns[0]: 'Grand Total'}
         for agg in summary_config.aggregates:
-            # For FIRST/VALUE functions (like Company), don't show a value in grand total
-            if agg.function.upper() in ('FIRST', 'VALUE'):
-                grand_total_row[agg.label] = ''  # Empty for string fields
-            else:
-                grand_total_row[agg.label] = grand_total_values.get(agg.label, 0)
+            grand_total_row[agg.label] = grand_total_values.get(agg.label, 0)
         
         # Add percentage for grand total (should be 100%)
         if '% of Total' in summary_config.columns:
@@ -2031,7 +2000,11 @@ def create_worksheet(wb: Workbook, worksheet_config: WorksheetConfig,
         
         # Write summary tables (aligned with detail table header row, or start from header_row if no detail)
         if worksheet_config.summary_config and summaries:
+            print(f"  DEBUG: Writing {len(worksheet_config.summary_config)} summaries for worksheet '{worksheet_config.name}'")
+            print(f"  DEBUG: Summary configs: {[sc.group_by for sc in worksheet_config.summary_config]}")
+            print(f"  DEBUG: Summary data lengths: {[len(s) for s in summaries]}")
             for summary_config, summary_data in zip(worksheet_config.summary_config, summaries):
+                print(f"  DEBUG: Writing summary table for '{summary_config.group_by}' at column '{summary_config.start_column}', {len(summary_data)} rows")
                 write_summary_table(ws, summary_data, summary_config, start_row=header_row)
     
     # Adjust column widths
