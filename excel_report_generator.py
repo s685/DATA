@@ -295,6 +295,8 @@ def create_worksheet_config_from_template(worksheet_name: str, table_name: str, 
     if query:
         # Clean up query - remove leading/trailing whitespace, normalize newlines
         query = query.strip()
+        # Debug: Print the query as read from config (first 300 chars)
+        print(f"  DEBUG: Query from config for '{worksheet_name}' (first 300 chars): {query[:300]}")
         # Use the provided query as-is
         pass
     else:
@@ -996,6 +998,11 @@ def execute_query(connection: snowflake.connector.SnowflakeConnection, query: st
         # Resolve table names if database and schema are provided
         if database and schema:
             query = resolve_table_names_in_query(query, database, schema)
+        
+        # Debug: Print the query being executed (first 500 chars)
+        print(f"  DEBUG: Executing query (first 500 chars): {query[:500]}")
+        if len(query) > 500:
+            print(f"  DEBUG: ... (query continues, total length: {len(query)} chars)")
         
         # Use a separate cursor for each query (thread-safe)
         cursor = connection.cursor()
