@@ -2206,7 +2206,7 @@ def load_config(config_path: str) -> Dict[str, Any]:
         sys.exit(1)
 
 
-def parse_config(config: Dict[str, Any]) -> Tuple[SnowflakeConfig, Dict[str, str], List[WorksheetConfig], Dict[str, Any]]:
+def parse_config(config: Dict[str, Any]) -> Tuple[SnowflakeConfig, List[WorksheetConfig], Dict[str, Any]]:
     """
     Parse configuration: Snowflake settings, worksheet-to-table mapping, and summary config
     Snowflake connection parameters are read from environment variables first, then fall back to config.yaml
@@ -2323,17 +2323,7 @@ def parse_config(config: Dict[str, Any]) -> Tuple[SnowflakeConfig, Dict[str, str
         else:
             print(f"Warning: Invalid format for worksheet '{worksheet_name}', skipping...")
     
-    # Build worksheet_tables mapping for backward compatibility (not used in current implementation)
-    worksheet_tables = {}
-    for ws_config in worksheets_config:
-        # Extract table name from query if possible
-        if ws_config.query:
-            # Try to extract table name from query (simple pattern matching)
-            match = re.search(r'FROM\s+([a-zA-Z_][a-zA-Z0-9_.]*)', ws_config.query, re.IGNORECASE)
-            if match:
-                worksheet_tables[ws_config.name] = match.group(1)
-    
-    return snowflake_cfg, worksheet_tables, worksheets_config, summary_config
+    return snowflake_cfg, worksheets_config, summary_config
 
 
 def main():
@@ -2391,7 +2381,7 @@ def main():
     config = load_config(args.config)
     
     # Parse configuration
-    snowflake_cfg, worksheet_tables, worksheets_config, summary_config = parse_config(config)
+    snowflake_cfg, worksheets_config, summary_config = parse_config(config)
     
     # Override database and schema for table name resolution if provided via command line
     # Note: Connection still uses config values, but queries will resolve table names using these
