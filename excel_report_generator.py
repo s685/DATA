@@ -1108,17 +1108,32 @@ def generate_summary(detail_records: List[Dict[str, Any]], summary_config: Summa
             else:
                 print(f"  DEBUG: Found TAT column: '{tat_column_name}'")
         
+        records_with_tat = 0
+        records_without_tat = 0
+        records_by_range = {}
+        
         for record in detail_records:
             # Get TAT_in_Days value with case-insensitive matching and categorize into range
             tat_value = get_tat_value_case_insensitive(record, 'TAT_in_Days')
+            if tat_value is None:
+                records_without_tat += 1
+                continue
+            
+            records_with_tat += 1
             group_key = get_tat_range(tat_value)
             # Include all records with valid TAT ranges
             if group_key is not None:
                 grouped[group_key].append(record)
+                records_by_range[group_key] = records_by_range.get(group_key, 0) + 1
             else:
                 # Debug: show records that were excluded (only first few to avoid spam)
                 if len([r for r in detail_records if get_tat_value_case_insensitive(r, 'TAT_in_Days') == tat_value]) <= 3:
                     print(f"  DEBUG: Excluded record with TAT_in_Days={tat_value} (not in valid range)")
+        
+        # Debug output for TAT summary
+        print(f"  DEBUG: TAT Summary - Total records: {len(detail_records)}, With TAT: {records_with_tat}, Without TAT: {records_without_tat}")
+        print(f"  DEBUG: Records by TAT range: {records_by_range}")
+        print(f"  DEBUG: Grouped records count: {sum(len(v) for v in grouped.values())}")
     else:
         # Standard grouping by field value
         # Handle case-insensitive column name matching
@@ -1414,42 +1429,55 @@ def apply_border(ws, row: int, col: int):
 
 def write_detail_table(ws, detail_records: List[Dict[str, Any]], 
                       worksheet_config: WorksheetConfig, start_row: int = 1):
-    """Write detail table to worksheet"""
-    if not detail_records:
-        return start_row
-    
-    # Get column names from first record or use configured columns
-    if worksheet_config.detail_columns and len(worksheet_config.detail_columns) > 0:
-        # Use configured display column names
-        columns = worksheet_config.detail_columns
-        # Map display names to actual column names from query results
-        actual_columns = list(detail_records[0].keys())
-        column_map = {}
-        for i, display_col in enumerate(columns):
-            if i < len(actual_columns):
-                # Try to match by position first
-                column_map[display_col] = actual_columns[i]
-            else:
-                # If no match by position, try to find by name (case-insensitive)
-                found = False
-                for actual_col in actual_columns:
-                    if actual_col.lower().replace('_', ' ') == display_col.lower():
-                        column_map[display_col] = actual_col
-                        found = True
-                        break
-                if not found:
-                    column_map[display_col] = display_col
+    """Write detail table to worksheet - always writes headers even if no data"""
+    # Determine column names from config or use empty list if no records
+    if detail_records:
+        # Get column names from first record or use configured columns
+        if worksheet_config.detail_columns and len(worksheet_config.detail_columns) > 0:
+            # Use configured display column names
+            columns = worksheet_config.detail_columns
+            # Map display names to actual column names from query results
+            actual_columns = list(detail_records[0].keys())
+            column_map = {}
+            for i, display_col in enumerate(columns):
+                if i < len(actual_columns):
+                    # Try to match by position first
+                    column_map[display_col] = actual_columns[i]
+                else:
+                    # If no match by position, try to find by name (case-insensitive)
+                    found = False
+                    for actual_col in actual_columns:
+                        if actual_col.lower().replace('_', ' ') == display_col.lower():
+                            column_map[display_col] = actual_col
+                            found = True
+                            break
+                    if not found:
+                        column_map[display_col] = display_col
+        else:
+            # Use actual column names from query results
+            columns = list(detail_records[0].keys())
+            column_map = {col: col for col in columns}
     else:
-        # Use actual column names from query results
-        columns = list(detail_records[0].keys())
-        column_map = {col: col for col in columns}
+        # No data - use configured columns if available, otherwise we'll write empty headers
+        if worksheet_config.detail_columns and len(worksheet_config.detail_columns) > 0:
+            columns = worksheet_config.detail_columns
+            column_map = {col: col for col in columns}
+        else:
+            # No data and no configured columns - can't determine headers
+            print(f"  WARNING: No data and no detail_columns configured for worksheet '{worksheet_config.name}'. Cannot write headers.")
+            return start_row
     
-    # Write headers
+    # Write headers (always write headers even if no data)
     start_col_idx = column_letter_to_index(worksheet_config.detail_start_column)
     header_row = worksheet_config.formatting.header_row if worksheet_config.formatting else start_row
     
     for col_idx, col_name in enumerate(columns):
         apply_cell_formatting(ws, header_row, start_col_idx + col_idx, col_name, is_header=True)
+    
+    # If no data, return after writing headers
+    if not detail_records:
+        print(f"  INFO: No data for worksheet '{worksheet_config.name}', but headers have been written.")
+        return header_row + 1  # Return next row after header
     
     # Write data rows
     data_start_row = header_row + 1
@@ -1501,7 +1529,10 @@ def write_summary_table(ws, summary_data: List[Dict[str, Any]],
                         summary_config: SummaryConfig, start_row: int = 1):
     """Write summary table to worksheet with Grand Total row formatting"""
     if not summary_data:
+        print(f"  WARNING: No summary data to write for group_by='{summary_config.group_by}'. Summary table will be empty.")
         return
+    
+    print(f"  DEBUG: Writing summary table for group_by='{summary_config.group_by}' with {len(summary_data)} rows")
     
     start_col_idx = column_letter_to_index(summary_config.start_column)
     header_row = start_row
@@ -1823,12 +1854,13 @@ def create_worksheet(wb: Workbook, worksheet_config: WorksheetConfig,
                           (worksheet_config.detail_columns is None or len(worksheet_config.detail_columns) == 0))
         
         # Write detail table only if not summary-only
-        if not is_summary_only and detail_records:
+        # Always write detail table (headers at minimum) even if no data
+        if not is_summary_only:
             last_detail_row = write_detail_table(ws, detail_records, worksheet_config, start_row=header_row)
-        elif is_summary_only:
-            # For summary-only worksheets, skip detail table writing entirely
-            # Only summaries will be written
-            pass
+        else:
+            # For summary-only worksheets, set last_detail_row to header_row
+            # Summaries will be written starting from header_row
+            last_detail_row = header_row
         
         # Handle spacing columns (spacing is handled by column positioning in summary_config)
         
@@ -2003,6 +2035,15 @@ def create_workbook(connection: snowflake.connector.SnowflakeConnection,
         if ws_config.name in worksheet_data:
             ws_config, detail_records, summaries = worksheet_data[ws_config.name]
             print(f"  Writing worksheet: {ws_config.name}")
+            print(f"    Detail records: {len(detail_records)}")
+            print(f"    Summaries: {len(summaries) if summaries else 0}")
+            if summaries:
+                for idx, summary in enumerate(summaries):
+                    print(f"      Summary {idx+1}: {len(summary)} rows")
+            if ws_config.summary_config:
+                print(f"    Summary configs: {len(ws_config.summary_config)}")
+                for idx, sum_cfg in enumerate(ws_config.summary_config):
+                    print(f"      Config {idx+1}: group_by='{sum_cfg.group_by}', start_column='{sum_cfg.start_column}'")
             create_worksheet(wb, ws_config, detail_records, summaries)
     
     return wb

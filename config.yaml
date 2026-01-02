@@ -162,3 +162,94 @@ worksheets:
     #   SELECT Policy, Claim_Number, Decision_Date, Inq_Date, Stat_Start_Date, Decision, Decision_Reason, Company, Issue_State, Resident_State, Product, Date_of_Loss, Schedule_ID_2
     #   FROM <your_schedule3_table_name>
     #   WHERE Schedule_ID = '3-007'
+
+  # Schedule 5 Worksheets
+
+  # 5-001: Detail records + Issue State/Resident State summaries
+  5-001:
+    table_name: <your_schedule5_table_name>
+    template_type: direct_dump_state_summary
+    # Optional: Custom query
+    # query: |
+    #   SELECT Policy_Num, Claim_Num, Product, Claim_Status, Company, Issue_State, Resident_State
+    #   FROM <your_schedule5_table_name>
+    #   WHERE Schedule_ID = '5-001'
+
+  # 5-002: Summary only (Issue State + Resident State summaries with Count and Company columns)
+  # NOTE: This uses a special structure with Count and Company columns
+  # If your data has pre-aggregated Count values, use this query format
+  5-002:
+    table_name: <your_schedule5_table_name>
+    template_type: state_summary_only
+    # Custom query required for this special structure
+    # query: |
+    #   SELECT Issue_State, Resident_State, Company, Count
+    #   FROM <your_schedule5_table_name>
+    #   WHERE Schedule_ID = '5-002'
+    # NOTE: This worksheet structure requires special handling - may need to use hardcoded structure
+
+  # 5-003: Detail records + TAT summary + Issue State/Resident State summaries
+  5-003:
+    table_name: <your_schedule5_table_name>
+    template_type: direct_dump_state_tat_summary
+    # Optional: Custom query (must include TAT_in_Days column)
+    # query: |
+    #   SELECT Policy_Num, Claim_Num, Product, Claim_Status, Company, Issue_State, Resident_State, TAT_in_Days
+    #   FROM <your_schedule5_table_name>
+    #   WHERE Schedule_ID = '5-003'
+
+  # 5-004: Detail records + Issue State/Resident State summaries
+  5-004:
+    table_name: <your_schedule5_table_name>
+    template_type: direct_dump_state_summary
+    # Optional: Custom query
+    # query: |
+    #   SELECT Policy_Num, Claim_Num, Product, Claim_Status, Company, Issue_State, Resident_State
+    #   FROM <your_schedule5_table_name>
+    #   WHERE Schedule_ID = '5-004'
+
+  # Schedule 6 Worksheets
+
+  # 6-001: Summary only (Issue State + Resident State summaries with Count and Company columns)
+  # NOTE: This uses a special structure with Count and Company columns
+  # If your data has pre-aggregated Count values, use this query format
+  6-001:
+    table_name: <your_schedule6_table_name>
+    template_type: state_summary_only
+    # Custom query required for this special structure
+    # query: |
+    #   SELECT Issue_State, Resident_State, Company, Count
+    #   FROM <your_schedule6_table_name>
+    #   WHERE Schedule_ID = '6-001'
+    # NOTE: This worksheet structure requires special handling - may need to use hardcoded structure
+
+  # 6-002: Detail records + Issue State/Resident State summaries (uses "Count" label instead of "CountOfPolicy No")
+  6-002:
+    table_name: <your_schedule6_table_name>
+    template_type: direct_dump_state_summary
+    # Optional: Custom query
+    # query: |
+    #   SELECT Policy_Num, Claim_Num, Product, Claim_Status, Company, Issue_State, Resident_State
+    #   FROM <your_schedule6_table_name>
+    #   WHERE Schedule_ID = '6-002'
+    # NOTE: This uses "Count" label - template uses "CountOfPolicy No" but will work with Policy_Num counting
+
+  # 6-003: Detail records + Issue State/Resident State summaries (same as 6-002)
+  6-003:
+    table_name: <your_schedule6_table_name>
+    template_type: direct_dump_state_summary
+    # Optional: Custom query
+    # query: |
+    #   SELECT Policy_Num, Claim_Num, Product, Claim_Status, Company, Issue_State, Resident_State
+    #   FROM <your_schedule6_table_name>
+    #   WHERE Schedule_ID = '6-003'
+
+  # 6-004: Detail records + Issue State/Resident State + Year Pay Req Received summaries
+  6-004:
+    table_name: <your_schedule6_table_name>
+    template_type: direct_dump_state_payreq_summary
+    # Optional: Custom query (must include Year_Pay_Req_Received column)
+    # query: |
+    #   SELECT Policy_Num, Claim_Num, Product, Claim_Status, Company, Issue_State, Resident_State, Year_Pay_Req_Received
+    #   FROM <your_schedule6_table_name>
+    #   WHERE Schedule_ID = '6-004'
