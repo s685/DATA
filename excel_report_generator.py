@@ -1481,13 +1481,13 @@ def create_summary_worksheet(wb, summary_data, schedule_titles=None, reporting_p
         id_header.value = "ID"
         id_header.font = bold_font
         id_header.alignment = Alignment(horizontal='left', vertical='top')
-        # No border for ID header
+        apply_border(ws, header_row, 1)
         
         desc_header = ws.cell(row=header_row, column=3)  # Column C (B is gap)
         desc_header.value = "Description"
         desc_header.font = bold_font
         desc_header.alignment = Alignment(horizontal='left', vertical='top')
-        # No border for Description header
+        apply_border(ws, header_row, 3)
         
         # Column E: Value header removed - values will still be written in data rows
         # No header cell for Value column
@@ -1511,7 +1511,7 @@ def create_summary_worksheet(wb, summary_data, schedule_titles=None, reporting_p
             id_cell.value = schedule_id
             id_cell.font = default_font
             id_cell.alignment = Alignment(horizontal='left', vertical='top')
-            # No border for ID column
+            apply_border(ws, row_num, 1)
             
             # Column C: Description (Column B is gap)
             description = get_col_value(row_data, 'Description')
@@ -1519,7 +1519,7 @@ def create_summary_worksheet(wb, summary_data, schedule_titles=None, reporting_p
             desc_cell.value = description
             desc_cell.font = default_font
             desc_cell.alignment = Alignment(horizontal='left', vertical='top', wrap_text=True)
-            # No border for Description column
+            apply_border(ws, row_num, 3)
             
             # Column E: Value (Column D is gap, highlighted in yellow)
             value = get_col_value(row_data, 'Value')
