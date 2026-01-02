@@ -1481,19 +1481,16 @@ def create_summary_worksheet(wb, summary_data, schedule_titles=None, reporting_p
         id_header.value = "ID"
         id_header.font = bold_font
         id_header.alignment = Alignment(horizontal='left', vertical='top')
-        apply_border(ws, header_row, 1)
+        # No border for ID header
         
         desc_header = ws.cell(row=header_row, column=3)  # Column C (B is gap)
         desc_header.value = "Description"
         desc_header.font = bold_font
         desc_header.alignment = Alignment(horizontal='left', vertical='top')
-        apply_border(ws, header_row, 3)
+        # No border for Description header
         
-        value_header = ws.cell(row=header_row, column=5)  # Column E (D is gap)
-        value_header.value = "Value"
-        value_header.font = bold_font
-        value_header.alignment = Alignment(horizontal='right', vertical='top')
-        apply_border(ws, header_row, 5)
+        # Column E: Value header removed - values will still be written in data rows
+        # No header cell for Value column
         
         # Write data rows - 1 row after headers
         data_start_row = header_row + 1
@@ -1514,7 +1511,7 @@ def create_summary_worksheet(wb, summary_data, schedule_titles=None, reporting_p
             id_cell.value = schedule_id
             id_cell.font = default_font
             id_cell.alignment = Alignment(horizontal='left', vertical='top')
-            apply_border(ws, row_num, 1)
+            # No border for ID column
             
             # Column C: Description (Column B is gap)
             description = get_col_value(row_data, 'Description')
@@ -1522,17 +1519,30 @@ def create_summary_worksheet(wb, summary_data, schedule_titles=None, reporting_p
             desc_cell.value = description
             desc_cell.font = default_font
             desc_cell.alignment = Alignment(horizontal='left', vertical='top', wrap_text=True)
-            apply_border(ws, row_num, 3)
+            # No border for Description column
             
             # Column E: Value (Column D is gap, highlighted in yellow)
             value = get_col_value(row_data, 'Value')
             value_cell = ws.cell(row=row_num, column=5)
             
-            # Format numeric values with thousand separators (commas) - US format: 101,037
+            # Format numeric values with thousand separators (commas) - US format: 283,315
+            # Try to convert to number if it's a string
+            numeric_value = None
             if isinstance(value, (int, float)):
-                # Format as string with US-style comma separators to ensure correct display
-                # This ensures 101037 displays as 101,037 (not 1,01,037)
-                value_cell.value = f"{int(value):,}" if isinstance(value, float) and value.is_integer() else f"{value:,}"
+                numeric_value = value
+            elif isinstance(value, str):
+                # Try to convert string to number (remove commas if already formatted)
+                try:
+                    cleaned_value = value.replace(',', '').strip()
+                    if cleaned_value:
+                        numeric_value = float(cleaned_value) if '.' in cleaned_value else int(cleaned_value)
+                except (ValueError, AttributeError):
+                    pass
+            
+            if numeric_value is not None:
+                # Set as number with Excel number format for comma separators
+                value_cell.value = numeric_value
+                value_cell.number_format = '#,##0'  # Excel format: 283,315
             else:
                 # For non-numeric values like "N/A", keep as string
                 value_cell.value = value
