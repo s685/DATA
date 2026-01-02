@@ -103,6 +103,7 @@ def create_summary_config_from_template_type(template_type: str, detail_columns_
     - 'direct_dump_tat_summary': Detail + TAT summary
     - 'direct_dump_state_tat_summary': Detail + Issue State + Resident State + TAT summaries
     - 'state_summary_only': Only summaries (Issue State + Resident State), no detail
+    - 'state_summary_with_company': Only summaries (Issue State + Resident State) with Count and Company columns
     - 'direct_dump_state_payreq_summary': Detail + Issue State + Resident State + Year Pay Req Received summaries
     
     Args:
@@ -207,6 +208,29 @@ def create_summary_config_from_template_type(template_type: str, detail_columns_
             )
         ]
     
+    elif template_type == 'state_summary_with_company':
+        # Only summaries with Count and Company columns (for 5-002, 6-001)
+        summary_configs = [
+            SummaryConfig(
+                group_by='Issue_State',
+                aggregates=[
+                    AggregateConfig(field='Policy_Num', function='COUNT', label='Count'),
+                    AggregateConfig(field='Company', function='COUNT', label='Company')  # Count of distinct companies per state
+                ],
+                start_column='A',  # Issue State: A-B-C
+                columns=['Issue State', 'Count', 'Company']
+            ),
+            SummaryConfig(
+                group_by='Resident_State',
+                aggregates=[
+                    AggregateConfig(field='Policy_Num', function='COUNT', label='Count'),
+                    AggregateConfig(field='Company', function='COUNT', label='Company')  # Count of distinct companies per state
+                ],
+                start_column='E',  # Gap D, Resident State: E-F-G
+                columns=['Resident State', 'Count', 'Company']
+            )
+        ]
+    
     elif template_type == 'direct_dump_state_payreq_summary':
         # Detail + Issue State + Resident State + Year Pay Req Received summaries
         detail_end_col = chr(ord('A') + detail_columns_count - 1)
@@ -241,7 +265,7 @@ def create_summary_config_from_template_type(template_type: str, detail_columns_
         ]
     
     else:
-        raise ValueError(f"Unknown template type: {template_type}. Valid types: direct_dump, direct_dump_state_summary, direct_dump_tat_summary, direct_dump_state_tat_summary, state_summary_only, direct_dump_state_payreq_summary")
+        raise ValueError(f"Unknown template type: {template_type}. Valid types: direct_dump, direct_dump_state_summary, direct_dump_tat_summary, direct_dump_state_tat_summary, state_summary_only, state_summary_with_company, direct_dump_state_payreq_summary")
     
     return summary_configs
 
@@ -282,6 +306,9 @@ def create_worksheet_config_from_template(worksheet_name: str, table_name: str, 
         if template_type == 'state_summary_only':
             # For summary-only, we still need a query to get data for summaries
             query = f"SELECT Policy_Num, Issue_State, Resident_State FROM {table_name} {where_clause}"
+        elif template_type == 'state_summary_with_company':
+            # For summary with company, include Company column
+            query = f"SELECT Policy_Num, Issue_State, Resident_State, Company FROM {table_name} {where_clause}"
         elif 'tat' in template_type.lower():
             # Include TAT_in_Days for TAT summaries
             query = f"SELECT Policy_Num, Claim_Num, Product, Claim_Status, Company, Issue_State, Resident_State, TAT_in_Days FROM {table_name} {where_clause}"

@@ -176,17 +176,14 @@ worksheets:
     #   WHERE Schedule_ID = '5-001'
 
   # 5-002: Summary only (Issue State + Resident State summaries with Count and Company columns)
-  # NOTE: This uses a special structure with Count and Company columns
-  # If your data has pre-aggregated Count values, use this query format
   5-002:
     table_name: <your_schedule5_table_name>
-    template_type: state_summary_only
-    # Custom query required for this special structure
+    template_type: state_summary_with_company
+    # Optional: Custom query (must include Policy_Num, Issue_State, Resident_State, Company)
     # query: |
-    #   SELECT Issue_State, Resident_State, Company, Count
+    #   SELECT Policy_Num, Issue_State, Resident_State, Company
     #   FROM <your_schedule5_table_name>
     #   WHERE Schedule_ID = '5-002'
-    # NOTE: This worksheet structure requires special handling - may need to use hardcoded structure
 
   # 5-003: Detail records + TAT summary + Issue State/Resident State summaries
   5-003:
@@ -211,17 +208,14 @@ worksheets:
   # Schedule 6 Worksheets
 
   # 6-001: Summary only (Issue State + Resident State summaries with Count and Company columns)
-  # NOTE: This uses a special structure with Count and Company columns
-  # If your data has pre-aggregated Count values, use this query format
   6-001:
     table_name: <your_schedule6_table_name>
-    template_type: state_summary_only
-    # Custom query required for this special structure
+    template_type: state_summary_with_company
+    # Optional: Custom query (must include Policy_Num, Issue_State, Resident_State, Company)
     # query: |
-    #   SELECT Issue_State, Resident_State, Company, Count
+    #   SELECT Policy_Num, Issue_State, Resident_State, Company
     #   FROM <your_schedule6_table_name>
     #   WHERE Schedule_ID = '6-001'
-    # NOTE: This worksheet structure requires special handling - may need to use hardcoded structure
 
   # 6-002: Detail records + Issue State/Resident State summaries (uses "Count" label instead of "CountOfPolicy No")
   6-002:
