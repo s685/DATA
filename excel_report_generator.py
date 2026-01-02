@@ -14,6 +14,7 @@ from collections import defaultdict
 from dataclasses import dataclass
 from typing import List, Dict, Any, Optional, Tuple
 from datetime import datetime
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 try:
     import snowflake.connector
@@ -951,25 +952,28 @@ def execute_query(connection: snowflake.connector.SnowflakeConnection, query: st
         if database and schema:
             query = resolve_table_names_in_query(query, database, schema)
         
+        # Use a separate cursor for each query (thread-safe)
         cursor = connection.cursor()
-        cursor.execute(query)
-        
-        # Get column names
-        columns = [desc[0] for desc in cursor.description]
-        
-        # Fetch all rows
-        rows = cursor.fetchall()
-        
-        # Convert to list of dictionaries
-        results = []
-        for row in rows:
-            row_dict = {}
-            for i, col in enumerate(columns):
-                row_dict[col] = row[i]
-            results.append(row_dict)
-        
-        cursor.close()
-        return results
+        try:
+            cursor.execute(query)
+            
+            # Get column names
+            columns = [desc[0] for desc in cursor.description]
+            
+            # Fetch all rows
+            rows = cursor.fetchall()
+            
+            # Convert to list of dictionaries
+            results = []
+            for row in rows:
+                row_dict = {}
+                for i, col in enumerate(columns):
+                    row_dict[col] = row[i]
+                results.append(row_dict)
+            
+            return results
+        finally:
+            cursor.close()
     except Exception as e:
         print(f"Error executing query: {e}")
         print(f"Query: {query[:200]}...")
@@ -1584,12 +1588,25 @@ def create_worksheet(wb: Workbook, worksheet_config: WorksheetConfig,
         # Determine header row
         header_row = worksheet_config.formatting.header_row if worksheet_config.formatting else 1
         
-        # Write detail table
-        last_detail_row = write_detail_table(ws, detail_records, worksheet_config, start_row=header_row)
+        # Check if this is a summary-only worksheet (state_summary_only template type)
+        # For summary-only worksheets like 1-001 and 1-006, we skip writing detail records
+        # The detail_records are still fetched and used to generate summaries, but not displayed
+        # Detection: summary-only has summary_config, no spacing_columns, and detail_columns is None/empty
+        is_summary_only = (worksheet_config.summary_config is not None and 
+                          len(worksheet_config.spacing_columns) == 0 and
+                          (worksheet_config.detail_columns is None or len(worksheet_config.detail_columns) == 0))
+        
+        # Write detail table only if not summary-only
+        if not is_summary_only and detail_records:
+            last_detail_row = write_detail_table(ws, detail_records, worksheet_config, start_row=header_row)
+        elif is_summary_only:
+            # For summary-only worksheets, skip detail table writing entirely
+            # Only summaries will be written
+            pass
         
         # Handle spacing columns (spacing is handled by column positioning in summary_config)
         
-        # Write summary tables (aligned with detail table header row)
+        # Write summary tables (aligned with detail table header row, or start from header_row if no detail)
         if worksheet_config.summary_config and summaries:
             for summary_config, summary_data in zip(worksheet_config.summary_config, summaries):
                 write_summary_table(ws, summary_data, summary_config, start_row=header_row)
@@ -1713,13 +1730,51 @@ def create_workbook(connection: snowflake.connector.SnowflakeConnection,
         create_summary_worksheet(wb, summary_data, schedule_titles_dict, reporting_period)
     
     # Process all detail worksheets AFTER Summary
+    # Use parallel processing to speed up data fetching
+    print(f"\nProcessing {len(worksheets_config)} worksheet(s)...")
+    
+    # Fetch data for all worksheets in parallel (I/O bound operation)
+    def fetch_worksheet_data(ws_config):
+        """Fetch data for a single worksheet"""
+        try:
+            detail_records, summaries = process_worksheet_data(connection, ws_config, database, schema)
+            return ws_config, detail_records, summaries
+        except Exception as e:
+            print(f"  Error processing {ws_config.name}: {e}")
+            raise
+    
+    # Use ThreadPoolExecutor for parallel query execution
+    # Note: Snowflake connection is thread-safe for read operations
+    worksheet_data = {}
+    max_workers = min(len(worksheets_config), 10)  # Limit to 10 concurrent queries
+    
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        # Submit all worksheet data fetching tasks
+        future_to_worksheet = {
+            executor.submit(fetch_worksheet_data, ws_config): ws_config 
+            for ws_config in worksheets_config
+        }
+        
+        # Process completed tasks as they finish
+        completed = 0
+        for future in as_completed(future_to_worksheet):
+            ws_config = future_to_worksheet[future]
+            try:
+                ws_config, detail_records, summaries = future.result()
+                worksheet_data[ws_config] = (detail_records, summaries)
+                completed += 1
+                print(f"  [{completed}/{len(worksheets_config)}] Fetched data for {ws_config.name}: {len(detail_records)} records")
+            except Exception as e:
+                print(f"  Error fetching data for {ws_config.name}: {e}")
+                raise
+    
+    # Write worksheets sequentially (Excel writing is not thread-safe)
+    print(f"\nWriting worksheets to Excel...")
     for ws_config in worksheets_config:
-        print(f"Processing worksheet: {ws_config.name}")
-        detail_records, summaries = process_worksheet_data(connection, ws_config, database, schema)
-        print(f"  Fetched {len(detail_records)} detail records")
-        if summaries:
-            print(f"  Generated {len(summaries)} summary table(s)")
-        create_worksheet(wb, ws_config, detail_records, summaries)
+        if ws_config in worksheet_data:
+            detail_records, summaries = worksheet_data[ws_config]
+            print(f"  Writing worksheet: {ws_config.name}")
+            create_worksheet(wb, ws_config, detail_records, summaries)
     
     return wb
 
