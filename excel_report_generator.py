@@ -1187,10 +1187,27 @@ def generate_summary(detail_records: List[Dict[str, Any]], summary_config: Summa
                 field_name.lower(),
                 field_name.upper(),
                 field_name.replace('_', ' '),
+                # Handle shortened versions (e.g., Resident_St vs Resident_State)
+                field_name.replace('_State', '_St'),
+                field_name.replace('_State', 'State'),
+                field_name.replace('State', 'St'),
+                # Handle Issue_State variations
+                field_name.replace('Issue_State', 'Issue_St'),
+                field_name.replace('Issue_State', 'IssueState'),
+                # Handle Resident_State variations
+                field_name.replace('Resident_State', 'Resident_St'),
+                field_name.replace('Resident_State', 'ResidentState'),
             ]
             for var in variations:
                 if var in record:
                     return record[var]
+            # Try partial matching (e.g., if looking for "Resident_State" but column is "Resident_St")
+            field_upper = field_name.upper()
+            for key in record.keys():
+                key_upper = key.upper()
+                # Check if field_name is a prefix of key or vice versa (for shortened names)
+                if (field_upper.startswith(key_upper) or key_upper.startswith(field_upper)) and len(key_upper) >= len(field_upper) * 0.7:
+                    return record[key]
             return None
         
         for record in detail_records:
