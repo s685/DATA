@@ -210,11 +210,13 @@ def create_summary_config_from_template_type(template_type: str, detail_columns_
     
     elif template_type == 'state_summary_with_company':
         # Only summaries with Count and Company columns (for 5-002, 6-001)
+        # If detail records have a Count column, use SUM; otherwise COUNT Policy_Num
+        # Company always uses COUNT to get distinct company count per state
         summary_configs = [
             SummaryConfig(
                 group_by='Issue_State',
                 aggregates=[
-                    AggregateConfig(field='Policy_Num', function='COUNT', label='Count'),
+                    AggregateConfig(field='Count', function='SUM', label='Count'),  # SUM Count column if exists, or COUNT records
                     AggregateConfig(field='Company', function='COUNT', label='Company')  # Count of distinct companies per state
                 ],
                 start_column='A',  # Issue State: A-B-C
@@ -223,7 +225,7 @@ def create_summary_config_from_template_type(template_type: str, detail_columns_
             SummaryConfig(
                 group_by='Resident_State',
                 aggregates=[
-                    AggregateConfig(field='Policy_Num', function='COUNT', label='Count'),
+                    AggregateConfig(field='Count', function='SUM', label='Count'),  # SUM Count column if exists, or COUNT records
                     AggregateConfig(field='Company', function='COUNT', label='Company')  # Count of distinct companies per state
                 ],
                 start_column='E',  # Gap D, Resident State: E-F-G
@@ -307,8 +309,8 @@ def create_worksheet_config_from_template(worksheet_name: str, table_name: str, 
             # For summary-only, we still need a query to get data for summaries
             query = f"SELECT Policy_Num, Issue_State, Resident_State FROM {table_name} {where_clause}"
         elif template_type == 'state_summary_with_company':
-            # For summary with company, include Company column
-            query = f"SELECT Policy_Num, Issue_State, Resident_State, Company FROM {table_name} {where_clause}"
+            # For summary with company, include Count and Company columns
+            query = f"SELECT Issue_State, Resident_State, Company, Count FROM {table_name} {where_clause}"
         elif 'tat' in template_type.lower():
             # Include TAT_in_Days for TAT summaries
             query = f"SELECT Policy_Num, Claim_Num, Product, Claim_Status, Company, Issue_State, Resident_State, TAT_in_Days FROM {table_name} {where_clause}"

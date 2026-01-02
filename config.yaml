@@ -179,9 +179,9 @@ worksheets:
   5-002:
     table_name: <your_schedule5_table_name>
     template_type: state_summary_with_company
-    # Optional: Custom query (must include Policy_Num, Issue_State, Resident_State, Company)
+    # Optional: Custom query (must include Issue_State, Resident_State, Company, Count)
     # query: |
-    #   SELECT Policy_Num, Issue_State, Resident_State, Company
+    #   SELECT Issue_State, Resident_State, Company, Count
     #   FROM <your_schedule5_table_name>
     #   WHERE Schedule_ID = '5-002'
 
@@ -211,9 +211,9 @@ worksheets:
   6-001:
     table_name: <your_schedule6_table_name>
     template_type: state_summary_with_company
-    # Optional: Custom query (must include Policy_Num, Issue_State, Resident_State, Company)
+    # Optional: Custom query (must include Issue_State, Resident_State, Company, Count)
     # query: |
-    #   SELECT Policy_Num, Issue_State, Resident_State, Company
+    #   SELECT Issue_State, Resident_State, Company, Count
     #   FROM <your_schedule6_table_name>
     #   WHERE Schedule_ID = '6-001'
 
