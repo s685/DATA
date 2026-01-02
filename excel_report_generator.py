@@ -1063,7 +1063,7 @@ def generate_summary(detail_records: List[Dict[str, Any]], summary_config: Summa
     if summary_config.group_by == 'TAT_Range':
         # Helper for case-insensitive field access
         def get_tat_value_case_insensitive(record, field_name):
-            """Get TAT_in_Days value with case-insensitive matching"""
+            """Get TAT_in_Days value with case-insensitive and space-insensitive matching"""
             # Try exact match first
             if field_name in record:
                 return record[field_name]
@@ -1071,16 +1071,42 @@ def generate_summary(detail_records: List[Dict[str, Any]], summary_config: Summa
             for key, value in record.items():
                 if key.upper() == field_name.upper():
                     return value
-            # Try common variations
+                # Also try matching with spaces normalized (replace spaces/underscores)
+                normalized_key = key.replace(' ', '_').replace('-', '_').upper()
+                normalized_field = field_name.replace(' ', '_').replace('-', '_').upper()
+                if normalized_key == normalized_field:
+                    return value
+            # Try common variations (with underscores, spaces, and hyphens)
             variations = [
                 'TAT_IN_DAYS', 'tat_in_days', 'Tat_In_Days',
+                'TAT IN DAYS', 'Tat In Days', 'tat in days',
+                'TAT-IN-DAYS', 'Tat-In-Days', 'tat-in-days',
                 'TAT_DAYS', 'tat_days', 'Tat_Days',
+                'TAT DAYS', 'Tat Days', 'tat days',
                 'TAT', 'tat', 'Tat'
             ]
             for var in variations:
                 if var in record:
                     return record[var]
             return None
+        
+        # Debug: Check if TAT column exists in data
+        if detail_records:
+            sample_record = detail_records[0]
+            tat_found = False
+            tat_column_name = None
+            for key in sample_record.keys():
+                normalized_key = key.replace(' ', '_').replace('-', '_').upper()
+                if 'TAT' in normalized_key and 'DAY' in normalized_key:
+                    tat_found = True
+                    tat_column_name = key
+                    break
+            
+            if not tat_found:
+                print(f"  WARNING: TAT column not found in data. Available columns: {list(sample_record.keys())}")
+                print(f"  Looking for columns containing 'TAT' and 'DAY' (case-insensitive, spaces/underscores ignored)")
+            else:
+                print(f"  DEBUG: Found TAT column: '{tat_column_name}'")
         
         for record in detail_records:
             # Get TAT_in_Days value with case-insensitive matching and categorize into range
@@ -1275,22 +1301,54 @@ def process_worksheet_data(connection: snowflake.connector.SnowflakeConnection,
     detail_records = fetch_detail_records(connection, worksheet_config.query, database, schema)
     
     # Generate summaries if configured
+    # Parallelize summary generation if there are multiple summaries (CPU-bound operation)
     summaries = []
     if worksheet_config.summary_config:
-        for sum_config in worksheet_config.summary_config:
-            # Include Grand Total for Schedule 1 worksheets (1-001, 1-004, 1-006)
-            # Also include for all state summaries (Issue_State, Resident_State)
-            include_grand_total = worksheet_config.name in ['1-001', '1-004', '1-006']
-            # For state summaries (Issue_State, Resident_State), always include grand total
-            if sum_config.group_by in ['Issue_State', 'Resident_State']:
-                include_grand_total = True
-            print(f"  DEBUG: Generating summary for '{sum_config.group_by}', include_grand_total={include_grand_total}")
-            summary_data = generate_summary(detail_records, sum_config, include_grand_total=include_grand_total)
-            # Debug: Check if grand total row was added
-            if summary_data:
-                has_grand_total = any(row.get(sum_config.columns[0]) == 'Grand Total' for row in summary_data)
-                print(f"  DEBUG: Summary has {len(summary_data)} rows, grand total present: {has_grand_total}")
-            summaries.append(summary_data)
+        if len(worksheet_config.summary_config) > 1:
+            # Multiple summaries - generate in parallel for better performance
+            def generate_single_summary(sum_config):
+                include_grand_total = worksheet_config.name in ['1-001', '1-004', '1-006']
+                if sum_config.group_by in ['Issue_State', 'Resident_State']:
+                    include_grand_total = True
+                return generate_summary(detail_records, sum_config, include_grand_total=include_grand_total)
+            
+            with ThreadPoolExecutor(max_workers=len(worksheet_config.summary_config)) as executor:
+                # Create a mapping of index to sum_config for proper ordering
+                summary_futures = {}
+                for idx, sum_config in enumerate(worksheet_config.summary_config):
+                    future = executor.submit(generate_single_summary, sum_config)
+                    summary_futures[future] = (idx, sum_config)
+                
+                # Collect results
+                summary_results = {}
+                for future in as_completed(summary_futures):
+                    idx, sum_config = summary_futures[future]
+                    try:
+                        summary_data = future.result()
+                        summary_results[idx] = summary_data
+                    except Exception as e:
+                        print(f"  Error generating summary for '{sum_config.group_by}': {e}")
+                        summary_results[idx] = []
+                
+                # Reorder summaries to match original config order
+                for idx in range(len(worksheet_config.summary_config)):
+                    summaries.append(summary_results.get(idx, []))
+        else:
+            # Single summary - generate sequentially
+            for sum_config in worksheet_config.summary_config:
+                # Include Grand Total for Schedule 1 worksheets (1-001, 1-004, 1-006)
+                # Also include for all state summaries (Issue_State, Resident_State)
+                include_grand_total = worksheet_config.name in ['1-001', '1-004', '1-006']
+                # For state summaries (Issue_State, Resident_State), always include grand total
+                if sum_config.group_by in ['Issue_State', 'Resident_State']:
+                    include_grand_total = True
+                print(f"  DEBUG: Generating summary for '{sum_config.group_by}', include_grand_total={include_grand_total}")
+                summary_data = generate_summary(detail_records, sum_config, include_grand_total=include_grand_total)
+                # Debug: Check if grand total row was added
+                if summary_data:
+                    has_grand_total = any(row.get(sum_config.columns[0]) == 'Grand Total' for row in summary_data)
+                    print(f"  DEBUG: Summary has {len(summary_data)} rows, grand total present: {has_grand_total}")
+                summaries.append(summary_data)
     
     return detail_records, summaries
 
@@ -1914,8 +1972,11 @@ def create_workbook(connection: snowflake.connector.SnowflakeConnection,
     # Use ThreadPoolExecutor for parallel query execution
     # Note: Snowflake connection is thread-safe for read operations
     worksheet_data = {}  # Key: worksheet name (string), Value: (ws_config, detail_records, summaries)
-    max_workers = min(len(worksheets_config), 10)  # Limit to 10 concurrent queries
+    # Increase max_workers for better parallelization (up to 20 concurrent queries)
+    # This helps when processing many worksheets
+    max_workers = min(len(worksheets_config), 20)  # Increased from 10 to 20 for better performance
     
+    print(f"  Using {max_workers} parallel workers for data fetching...")
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         # Submit all worksheet data fetching tasks
         future_to_worksheet = {
