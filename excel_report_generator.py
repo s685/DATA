@@ -216,8 +216,8 @@ def create_summary_config_from_template_type(template_type: str, detail_columns_
             SummaryConfig(
                 group_by='Issue_State',
                 aggregates=[
-                    AggregateConfig(field='Count', function='SUM', label='Count'),  # SUM Count column if exists, or COUNT records
-                    AggregateConfig(field='Company', function='COUNT', label='Company')  # Count of distinct companies per state
+                    AggregateConfig(field='Count', function='SUM', label='Count'),  # SUM Count column
+                    AggregateConfig(field='Company', function='FIRST', label='Company')  # Display company name (first value)
                 ],
                 start_column='A',  # Issue State: A-B-C
                 columns=['Issue State', 'Count', 'Company']
@@ -225,8 +225,8 @@ def create_summary_config_from_template_type(template_type: str, detail_columns_
             SummaryConfig(
                 group_by='Resident_State',
                 aggregates=[
-                    AggregateConfig(field='Count', function='SUM', label='Count'),  # SUM Count column if exists, or COUNT records
-                    AggregateConfig(field='Company', function='COUNT', label='Company')  # Count of distinct companies per state
+                    AggregateConfig(field='Count', function='SUM', label='Count'),  # SUM Count column
+                    AggregateConfig(field='Company', function='FIRST', label='Company')  # Display company name (first value)
                 ],
                 start_column='E',  # Gap D, Resident State: E-F-G
                 columns=['Resident State', 'Count', 'Company']
@@ -684,7 +684,7 @@ def get_hardcoded_worksheet_structure(worksheet_name: str, table_name: str) -> O
                     group_by='Issue_State',
                     aggregates=[
                         AggregateConfig(field='Count', function='SUM', label='Count'),
-                        AggregateConfig(field='Company', function='COUNT', label='Company')  # Count of distinct companies per state
+                        AggregateConfig(field='Company', function='FIRST', label='Company')  # Display company name (first value)
                     ],
                     start_column='A',  # Issue State: A-B-C
                     columns=['Issue State', 'Count', 'Company']
@@ -693,7 +693,7 @@ def get_hardcoded_worksheet_structure(worksheet_name: str, table_name: str) -> O
                     group_by='Resident_State',
                     aggregates=[
                         AggregateConfig(field='Count', function='SUM', label='Count'),
-                        AggregateConfig(field='Company', function='COUNT', label='Company')  # Count of distinct companies per state
+                        AggregateConfig(field='Company', function='FIRST', label='Company')  # Display company name (first value)
                     ],
                     start_column='E',  # Gap D, Resident State: E-F-G
                     columns=['Resident State', 'Count', 'Company']
@@ -771,7 +771,7 @@ def get_hardcoded_worksheet_structure(worksheet_name: str, table_name: str) -> O
                     group_by='Issue_State',
                     aggregates=[
                         AggregateConfig(field='Count', function='SUM', label='Count'),
-                        AggregateConfig(field='Company', function='COUNT', label='Company')
+                        AggregateConfig(field='Company', function='FIRST', label='Company')  # Display company name (first value)
                     ],
                     start_column='A',  # Issue State: A-B-C
                     columns=['Issue State', 'Count', 'Company']
@@ -780,7 +780,7 @@ def get_hardcoded_worksheet_structure(worksheet_name: str, table_name: str) -> O
                     group_by='Resident_State',
                     aggregates=[
                         AggregateConfig(field='Count', function='SUM', label='Count'),
-                        AggregateConfig(field='Company', function='COUNT', label='Company')
+                        AggregateConfig(field='Company', function='FIRST', label='Company')  # Display company name (first value)
                     ],
                     start_column='E',  # Gap D, Resident State: E-F-G
                     columns=['Resident State', 'Count', 'Company']
@@ -1287,6 +1287,14 @@ def generate_summary(detail_records: List[Dict[str, Any]], summary_config: Summa
                     return None
                 values = [get_field_val(r, field_value) for r in records if get_field_val(r, field_value) is not None]
                 value = max(values) if values else None
+            elif function == 'FIRST' or function == 'VALUE':
+                # Get first non-null value from the field (for displaying company name, etc.)
+                value = ''
+                for record in records:
+                    val = get_field_val(record, field_value)
+                    if val is not None and val != '':
+                        value = val
+                        break
             else:
                 value = 0
             
