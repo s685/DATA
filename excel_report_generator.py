@@ -88,6 +88,7 @@ class WorksheetConfig:
     layout_type: str = "table"  # "table" or "form"
     form_layout: Dict[str, Any] = None
     null_substitute: Optional[Dict[str, Any]] = None  # Dict mapping column names to substitution values (e.g., {"Date_of_Loss": 0})
+    exclude_from_detail: Optional[List[str]] = None  # List of column names to exclude from detail table (e.g., ["Year_Pay_Req_Received"])
 
 
 # ============================================================================
@@ -277,7 +278,8 @@ def create_worksheet_config_from_template(worksheet_name: str, table_name: str, 
                                          query: Optional[str] = None, detail_columns: Optional[List[str]] = None,
                                          filter_clause: Optional[str] = None,
                                          currency_columns: Optional[List[str]] = None,
-                                         null_substitute: Optional[Dict[str, Any]] = None) -> WorksheetConfig:
+                                         null_substitute: Optional[Dict[str, Any]] = None,
+                                         exclude_from_detail: Optional[List[str]] = None) -> WorksheetConfig:
     """
     Create worksheet configuration from template type.
     
@@ -369,6 +371,11 @@ def create_worksheet_config_from_template(worksheet_name: str, table_name: str, 
     if template_type in ('state_summary_only', 'state_summary_with_company'):
         final_detail_columns = None  # No detail columns to display
     
+    # For payreq template type, automatically exclude Year_Pay_Req_Received from detail if not explicitly set
+    final_exclude_from_detail = exclude_from_detail
+    if 'payreq' in template_type.lower() and final_exclude_from_detail is None:
+        final_exclude_from_detail = ['Year_Pay_Req_Received']
+    
     return WorksheetConfig(
         name=worksheet_name,
         query=query,
@@ -377,7 +384,8 @@ def create_worksheet_config_from_template(worksheet_name: str, table_name: str, 
         spacing_columns=spacing_columns,
         summary_config=summary_config,
         formatting=formatting,
-        null_substitute=null_substitute  # Dict mapping column names to substitution values for null/None
+        null_substitute=null_substitute,  # Dict mapping column names to substitution values for null/None
+        exclude_from_detail=final_exclude_from_detail  # List of columns to exclude from detail table
     )
 
 
@@ -1647,12 +1655,22 @@ def apply_border(ws, row: int, col: int):
 def write_detail_table(ws, detail_records: List[Dict[str, Any]], 
                       worksheet_config: WorksheetConfig, start_row: int = 1):
     """Write detail table to worksheet - always writes headers even if no data"""
+    # Helper function to check if column should be excluded (case-insensitive)
+    def should_exclude_column(col_name: str) -> bool:
+        if not worksheet_config.exclude_from_detail:
+            return False
+        col_upper = col_name.upper()
+        for exclude_col in worksheet_config.exclude_from_detail:
+            if exclude_col.upper() == col_upper:
+                return True
+        return False
+    
     # Determine column names from config or use empty list if no records
     if detail_records:
         # Get column names from first record or use configured columns
         if worksheet_config.detail_columns and len(worksheet_config.detail_columns) > 0:
-            # Use configured display column names
-            columns = worksheet_config.detail_columns
+            # Use configured display column names, but exclude specified columns
+            columns = [col for col in worksheet_config.detail_columns if not should_exclude_column(col)]
             # Map display names to actual column names from query results
             actual_columns = list(detail_records[0].keys())
             column_map = {}
@@ -1671,13 +1689,14 @@ def write_detail_table(ws, detail_records: List[Dict[str, Any]],
                     if not found:
                         column_map[display_col] = display_col
         else:
-            # Use actual column names from query results
-            columns = list(detail_records[0].keys())
+            # Use actual column names from query results, but exclude specified columns
+            all_columns = list(detail_records[0].keys())
+            columns = [col for col in all_columns if not should_exclude_column(col)]
             column_map = {col: col for col in columns}
     else:
         # No data - use configured columns if available, otherwise we'll write empty headers
         if worksheet_config.detail_columns and len(worksheet_config.detail_columns) > 0:
-            columns = worksheet_config.detail_columns
+            columns = [col for col in worksheet_config.detail_columns if not should_exclude_column(col)]
             column_map = {col: col for col in columns}
         else:
             # No data and no configured columns - can't determine headers
@@ -2410,6 +2429,7 @@ def parse_config(config: Dict[str, Any]) -> Tuple[SnowflakeConfig, List[Workshee
             filter_clause = worksheet_data.get('filter') or worksheet_data.get('where') or worksheet_data.get('where_clause')
             currency_columns = worksheet_data.get('currency_columns')  # List of column names to format as currency
             null_substitute = worksheet_data.get('null_substitute')  # Dict mapping column names to substitution values
+            exclude_from_detail = worksheet_data.get('exclude_from_detail')  # List of columns to exclude from detail table
             
             if not table_name:
                 print(f"Warning: Worksheet '{worksheet_name}' missing table_name, skipping...")
@@ -2427,11 +2447,14 @@ def parse_config(config: Dict[str, Any]) -> Tuple[SnowflakeConfig, List[Workshee
                 # Apply null substitution to hardcoded config if specified
                 if ws_config and null_substitute:
                     ws_config.null_substitute = null_substitute
+                # Apply exclude_from_detail to hardcoded config if specified
+                if ws_config and exclude_from_detail:
+                    ws_config.exclude_from_detail = exclude_from_detail
             else:
                 # Use template type to create config
                 try:
                     ws_config = create_worksheet_config_from_template(
-                        worksheet_name, table_name, template_type, query, detail_columns, filter_clause, currency_columns, null_substitute
+                        worksheet_name, table_name, template_type, query, detail_columns, filter_clause, currency_columns, null_substitute, exclude_from_detail
                     )
                 except ValueError as e:
                     print(f"Error: {e}")

@@ -244,7 +244,7 @@ worksheets:
     template_type: direct_dump_state_payreq_summary
     # Custom query required - include all detail columns you want to display + grouping columns
     # IMPORTANT: Must derive Year_Pay_Req_Received from pay_req_received column using YEAR() function
-    # The grouping logic will count records for each year value
+    # Year_Pay_Req_Received will be automatically excluded from detail table (only used for summary grouping)
     # If your table uses shortened names (e.g., Resident_St), use column aliases:
     #   SELECT ..., Resident_St AS Resident_State, ...
     # Example (adjust column names to match your actual table column names):
@@ -253,7 +253,12 @@ worksheets:
              YEAR(pay_req_received) AS Year_Pay_Req_Received
       FROM <your_schedule6_table_name>
       WHERE Schedule_ID = '6-004'
+    # Optional: explicitly exclude columns from detail table (Year_Pay_Req_Received is auto-excluded for payreq template)
+    # exclude_from_detail:
+    #   - Year_Pay_Req_Received
     # Notes:
     # - Year_Pay_Req_Received is derived from pay_req_received column using YEAR() function
-    # - The summary will group by year and show counts for each year
+    # - The summary will group by year and show counts for each year (2015, 2022, 2023, etc.)
+    # - Year_Pay_Req_Received is automatically excluded from detail table display (only used for grouping)
     # - If you get "invalid identifier" errors, check your actual column names and use aliases
+    # - Make sure pay_req_received column exists and contains date/timestamp values
