@@ -320,9 +320,10 @@ def create_worksheet_config_from_template(worksheet_name: str, table_name: str, 
             query = f"SELECT Policy_Num, Claim_Num, Product, Claim_Status, Company, Issue_State, Resident_State, TAT_in_Days FROM {table_name} {where_clause}"
         elif 'payreq' in template_type.lower():
             # Include Year_Pay_Req_Received for pay req summaries
-            # Only select columns needed for summaries (grouping columns)
+            # Extract year from pay_req_received column if Year_Pay_Req_Received doesn't exist
             # User should provide custom query if they need detail columns with different names
-            query = f"SELECT Issue_State, Resident_State, Year_Pay_Req_Received FROM {table_name} {where_clause}"
+            # Try to derive year from pay_req_received column
+            query = f"SELECT Issue_State, Resident_State, YEAR(pay_req_received) AS Year_Pay_Req_Received FROM {table_name} {where_clause}"
         else:
             # Default query for state summaries or direct dump
             query = f"SELECT Policy_Num, Claim_Num, Product, Claim_Status, Company, Issue_State, Resident_State FROM {table_name} {where_clause}"
@@ -816,14 +817,14 @@ def get_hardcoded_worksheet_structure(worksheet_name: str, table_name: str) -> O
         )
     
     # Worksheet 6-004 - Same as 6-003 + Additional Summary (Counts, Year Pay Req Received)
-    # NOTE: This hardcoded structure uses generic column names. For actual use, provide a custom query
-    # with your actual column names (e.g., Policy instead of Policy_Num, doc_id, etc.)
+    # NOTE: This hardcoded structure derives Year_Pay_Req_Received from pay_req_received column
+    # For actual use, provide a custom query with your actual column names
     elif worksheet_name == '6-004':
-        # Only select grouping columns to avoid "invalid identifier" errors
-        # User should provide custom query with actual column names
+        # Derive Year_Pay_Req_Received from pay_req_received column using YEAR() function
+        # User should provide custom query with actual column names if different
         return WorksheetConfig(
             name='6-004',
-            query=f"SELECT Issue_State, Resident_State, Year_Pay_Req_Received FROM {table_name} WHERE Schedule_ID = '6-004'",
+            query=f"SELECT Issue_State, Resident_State, YEAR(pay_req_received) AS Year_Pay_Req_Received FROM {table_name} WHERE Schedule_ID = '6-004'",
             detail_start_column='A',
             detail_columns=None,  # Use actual column names from query results
             spacing_columns=[],  # No detail columns, so no spacing needed
