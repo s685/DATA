@@ -328,8 +328,8 @@ def create_worksheet_config_from_template(worksheet_name: str, table_name: str, 
     # Calculate detail columns count for spacing
     if detail_columns:
         detail_columns_count = len(detail_columns)
-    elif template_type == 'state_summary_only':
-        detail_columns_count = 0  # No detail columns
+    elif template_type in ('state_summary_only', 'state_summary_with_company'):
+        detail_columns_count = 0  # No detail columns - summary only
     else:
         # Estimate from query - count SELECT columns
         select_part = query.split('FROM')[0].replace('SELECT', '').strip()
@@ -343,7 +343,7 @@ def create_worksheet_config_from_template(worksheet_name: str, table_name: str, 
             print(f"    Summary config {idx+1}: group_by='{sc.group_by}', start_column='{sc.start_column}', columns={sc.columns}")
     
     # Determine spacing columns
-    if template_type == 'state_summary_only':
+    if template_type in ('state_summary_only', 'state_summary_with_company'):
         spacing_columns = []  # No detail, so no spacing needed
     elif summary_config is None:
         spacing_columns = []  # No summaries, so no spacing needed
@@ -352,7 +352,7 @@ def create_worksheet_config_from_template(worksheet_name: str, table_name: str, 
         spacing_columns = [chr(ord('A') + detail_columns_count)]
     
     # Determine if filters should be enabled
-    filters_enabled = template_type != 'state_summary_only'
+    filters_enabled = template_type not in ('state_summary_only', 'state_summary_with_company')
     
     # Create formatting config with currency columns if provided
     formatting = FormattingConfig(
@@ -361,11 +361,16 @@ def create_worksheet_config_from_template(worksheet_name: str, table_name: str, 
         currency_columns=currency_columns
     )
     
+    # For summary-only templates, set detail_columns to None/empty to prevent detail table display
+    final_detail_columns = detail_columns
+    if template_type in ('state_summary_only', 'state_summary_with_company'):
+        final_detail_columns = None  # No detail columns to display
+    
     return WorksheetConfig(
         name=worksheet_name,
         query=query,
         detail_start_column='A',
-        detail_columns=detail_columns,  # None means use actual column names from query
+        detail_columns=final_detail_columns,  # None means use actual column names from query (but won't display for summary-only)
         spacing_columns=spacing_columns,
         summary_config=summary_config,
         formatting=formatting
@@ -1986,8 +1991,8 @@ def create_worksheet(wb: Workbook, worksheet_config: WorksheetConfig,
         # Determine header row
         header_row = worksheet_config.formatting.header_row if worksheet_config.formatting else 1
         
-        # Check if this is a summary-only worksheet (state_summary_only template type)
-        # For summary-only worksheets like 1-001 and 1-006, we skip writing detail records
+        # Check if this is a summary-only worksheet (state_summary_only or state_summary_with_company template types)
+        # For summary-only worksheets like 1-001, 1-006, 5-002, 6-001, we skip writing detail records
         # The detail_records are still fetched and used to generate summaries, but not displayed
         # Detection: summary-only has summary_config, no spacing_columns, and detail_columns is None/empty
         is_summary_only = (worksheet_config.summary_config is not None and 
