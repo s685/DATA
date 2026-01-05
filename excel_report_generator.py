@@ -1652,6 +1652,44 @@ def apply_border(ws, row: int, col: int):
     cell.border = thin_border
 
 
+def extract_column_names_from_query(query: str) -> List[str]:
+    """
+    Extract column names from SQL SELECT query.
+    Handles aliases (e.g., 'YEAR(date) AS Year' -> 'Year')
+    """
+    try:
+        # Find SELECT clause
+        select_start = query.upper().find('SELECT')
+        if select_start == -1:
+            return []
+        
+        from_start = query.upper().find('FROM', select_start)
+        if from_start == -1:
+            return []
+        
+        select_clause = query[select_start + 6:from_start].strip()
+        
+        # Split by comma and extract column names
+        columns = []
+        for col in select_clause.split(','):
+            col = col.strip()
+            # Handle AS alias (e.g., "YEAR(date) AS Year" -> "Year")
+            if ' AS ' in col.upper():
+                alias = col.upper().split(' AS ')[-1].strip()
+                columns.append(alias)
+            elif ' ' in col and not col.startswith('('):
+                # Simple column name (might have table prefix)
+                parts = col.split()
+                columns.append(parts[-1])  # Take last part
+            else:
+                # Simple column name
+                columns.append(col)
+        
+        return columns
+    except Exception:
+        return []
+
+
 def write_detail_table(ws, detail_records: List[Dict[str, Any]], 
                       worksheet_config: WorksheetConfig, start_row: int = 1):
     """Write detail table to worksheet - always writes headers even if no data"""
@@ -1694,25 +1732,38 @@ def write_detail_table(ws, detail_records: List[Dict[str, Any]],
             columns = [col for col in all_columns if not should_exclude_column(col)]
             column_map = {col: col for col in columns}
     else:
-        # No data - use configured columns if available, otherwise we'll write empty headers
+        # No data - use configured columns if available, otherwise try to extract from query
         if worksheet_config.detail_columns and len(worksheet_config.detail_columns) > 0:
             columns = [col for col in worksheet_config.detail_columns if not should_exclude_column(col)]
             column_map = {col: col for col in columns}
         else:
-            # No data and no configured columns - can't determine headers
-            print(f"  WARNING: No data and no detail_columns configured for worksheet '{worksheet_config.name}'. Cannot write headers.")
-            return start_row
+            # Try to extract column names from query
+            query_columns = extract_column_names_from_query(worksheet_config.query)
+            if query_columns:
+                columns = [col for col in query_columns if not should_exclude_column(col)]
+                column_map = {col: col for col in columns}
+                print(f"  INFO: No data for worksheet '{worksheet_config.name}', extracted {len(columns)} column names from query for headers.")
+            else:
+                # Still can't determine headers - use empty list but still write something
+                print(f"  WARNING: No data and cannot determine column names for worksheet '{worksheet_config.name}'. Headers will be empty.")
+                columns = []
+                column_map = {}
     
     # Write headers (always write headers even if no data)
     start_col_idx = column_letter_to_index(worksheet_config.detail_start_column)
     header_row = worksheet_config.formatting.header_row if worksheet_config.formatting else start_row
     
-    for col_idx, col_name in enumerate(columns):
-        apply_cell_formatting(ws, header_row, start_col_idx + col_idx, col_name, is_header=True)
+    # Always write headers if we have column names
+    if columns:
+        for col_idx, col_name in enumerate(columns):
+            apply_cell_formatting(ws, header_row, start_col_idx + col_idx, col_name, is_header=True)
     
     # If no data, return after writing headers
     if not detail_records:
-        print(f"  INFO: No data for worksheet '{worksheet_config.name}', but headers have been written.")
+        if columns:
+            print(f"  INFO: No data for worksheet '{worksheet_config.name}', but headers have been written ({len(columns)} columns).")
+        else:
+            print(f"  WARNING: No data and no column names determined for worksheet '{worksheet_config.name}'. No headers written.")
         return header_row + 1  # Return next row after header
     
     # Write data rows
