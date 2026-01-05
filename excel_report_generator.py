@@ -11,7 +11,7 @@ import os
 import yaml
 import re
 from collections import defaultdict
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import List, Dict, Any, Optional, Tuple
 from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -87,6 +87,7 @@ class WorksheetConfig:
     formatting: FormattingConfig = None
     layout_type: str = "table"  # "table" or "form"
     form_layout: Dict[str, Any] = None
+    null_substitute: Optional[Dict[str, Any]] = None  # Dict mapping column names to substitution values (e.g., {"Date_of_Loss": 0})
 
 
 # ============================================================================
@@ -275,7 +276,8 @@ def create_summary_config_from_template_type(template_type: str, detail_columns_
 def create_worksheet_config_from_template(worksheet_name: str, table_name: str, template_type: str, 
                                          query: Optional[str] = None, detail_columns: Optional[List[str]] = None,
                                          filter_clause: Optional[str] = None,
-                                         currency_columns: Optional[List[str]] = None) -> WorksheetConfig:
+                                         currency_columns: Optional[List[str]] = None,
+                                         null_substitute: Optional[Dict[str, Any]] = None) -> WorksheetConfig:
     """
     Create worksheet configuration from template type.
     
@@ -373,7 +375,8 @@ def create_worksheet_config_from_template(worksheet_name: str, table_name: str, 
         detail_columns=final_detail_columns,  # None means use actual column names from query (but won't display for summary-only)
         spacing_columns=spacing_columns,
         summary_config=summary_config,
-        formatting=formatting
+        formatting=formatting,
+        null_substitute=null_substitute  # Dict mapping column names to substitution values for null/None
     )
 
 
@@ -1454,12 +1457,66 @@ def generate_summary(detail_records: List[Dict[str, Any]], summary_config: Summa
     return summary_rows
 
 
+def substitute_null_values(records: List[Dict[str, Any]], null_substitute: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """
+    Substitute null/None values in records with specified values.
+    
+    Args:
+        records: List of record dictionaries
+        null_substitute: Dictionary mapping column names to substitution values
+                        (e.g., {"Date_of_Loss": 0, "Benefit_Pd_Since_Inception": 0})
+    
+    Returns:
+        List of records with null values substituted
+    """
+    if not null_substitute:
+        return records
+    
+    def get_column_value_case_insensitive(record: Dict[str, Any], column_name: str) -> Any:
+        """Get column value with case-insensitive matching"""
+        if column_name in record:
+            return record[column_name]
+        column_upper = column_name.upper()
+        for key, value in record.items():
+            if key.upper() == column_upper:
+                return value
+        return None
+    
+    def set_column_value_case_insensitive(record: Dict[str, Any], column_name: str, value: Any):
+        """Set column value with case-insensitive matching"""
+        if column_name in record:
+            record[column_name] = value
+            return
+        column_upper = column_name.upper()
+        for key in record.keys():
+            if key.upper() == column_upper:
+                record[key] = value
+                return
+        # If not found, add with original column name
+        record[column_name] = value
+    
+    processed_records = []
+    for record in records:
+        processed_record = record.copy()
+        for column_name, substitute_value in null_substitute.items():
+            current_value = get_column_value_case_insensitive(processed_record, column_name)
+            if current_value is None or (isinstance(current_value, str) and current_value.strip() == ''):
+                set_column_value_case_insensitive(processed_record, column_name, substitute_value)
+        processed_records.append(processed_record)
+    
+    return processed_records
+
+
 def process_worksheet_data(connection: snowflake.connector.SnowflakeConnection, 
                            worksheet_config: WorksheetConfig,
                            database: Optional[str] = None, schema: Optional[str] = None) -> Tuple[List[Dict[str, Any]], List[List[Dict[str, Any]]]]:
     """Process worksheet data: fetch details and generate summaries"""
     # Fetch detail records
     detail_records = fetch_detail_records(connection, worksheet_config.query, database, schema)
+    
+    # Substitute null values if configured
+    if worksheet_config.null_substitute:
+        detail_records = substitute_null_values(detail_records, worksheet_config.null_substitute)
     
     # Generate summaries if configured
     # Parallelize summary generation if there are multiple summaries (CPU-bound operation)
@@ -2327,6 +2384,7 @@ def parse_config(config: Dict[str, Any]) -> Tuple[SnowflakeConfig, List[Workshee
             detail_columns = worksheet_data.get('detail_columns')
             filter_clause = worksheet_data.get('filter') or worksheet_data.get('where') or worksheet_data.get('where_clause')
             currency_columns = worksheet_data.get('currency_columns')  # List of column names to format as currency
+            null_substitute = worksheet_data.get('null_substitute')  # Dict mapping column names to substitution values
             
             if not table_name:
                 print(f"Warning: Worksheet '{worksheet_name}' missing table_name, skipping...")
@@ -2341,16 +2399,22 @@ def parse_config(config: Dict[str, Any]) -> Tuple[SnowflakeConfig, List[Workshee
                         ws_config.formatting.currency_columns = currency_columns
                     else:
                         ws_config.formatting = FormattingConfig(currency_columns=currency_columns)
+                # Apply null substitution to hardcoded config if specified
+                if ws_config and null_substitute:
+                    ws_config.null_substitute = null_substitute
             else:
                 # Use template type to create config
                 try:
                     ws_config = create_worksheet_config_from_template(
-                        worksheet_name, table_name, template_type, query, detail_columns, filter_clause, currency_columns
+                        worksheet_name, table_name, template_type, query, detail_columns, filter_clause, currency_columns, null_substitute
                     )
                 except ValueError as e:
                     print(f"Error: {e}")
                     print(f"  Falling back to hardcoded structure for '{worksheet_name}'...")
                     ws_config = get_hardcoded_worksheet_structure(worksheet_name, table_name)
+                    # Apply null substitution to hardcoded config if specified
+                    if ws_config and null_substitute:
+                        ws_config.null_substitute = null_substitute
             
             if ws_config:
                 worksheets_config.append(ws_config)
