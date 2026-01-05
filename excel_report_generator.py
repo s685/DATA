@@ -1673,22 +1673,47 @@ def extract_column_names_from_query(query: str) -> List[str]:
         return text.strip()
     
     try:
+        # Normalize query - replace newlines with spaces for easier parsing
+        normalized_query = ' '.join(query.split())
+        
         # Find SELECT clause
-        select_start = query.upper().find('SELECT')
+        select_start = normalized_query.upper().find('SELECT')
         if select_start == -1:
             return []
         
-        from_start = query.upper().find('FROM', select_start)
+        from_start = normalized_query.upper().find('FROM', select_start)
         if from_start == -1:
             return []
         
-        select_clause = query[select_start + 6:from_start].strip()
+        select_clause = normalized_query[select_start + 6:from_start].strip()
         
         # Split by comma and extract column names
+        # Handle multi-line queries and complex expressions
         columns = []
-        for col in select_clause.split(','):
+        # Split by comma, but be careful with commas inside function calls
+        # Simple approach: split by comma and process each part
+        parts = []
+        current_part = ""
+        paren_depth = 0
+        for char in select_clause:
+            if char == '(':
+                paren_depth += 1
+                current_part += char
+            elif char == ')':
+                paren_depth -= 1
+                current_part += char
+            elif char == ',' and paren_depth == 0:
+                if current_part.strip():
+                    parts.append(current_part.strip())
+                current_part = ""
+            else:
+                current_part += char
+        if current_part.strip():
+            parts.append(current_part.strip())
+        
+        for col in parts:
             col = col.strip()
-            # Handle AS alias (e.g., "YEAR(date) AS Year" -> "Year")
+            # Handle AS alias (e.g., "YEAR(TO_DATE(date)) AS Year" -> "Year")
             # Use case-insensitive search but preserve original case
             as_match = re.search(r'\s+AS\s+', col, re.IGNORECASE)
             if as_match:
@@ -1696,14 +1721,20 @@ def extract_column_names_from_query(query: str) -> List[str]:
                 alias = strip_quotes(alias)
                 columns.append(alias)
             elif ' ' in col and not col.startswith('('):
-                # Simple column name (might have table prefix)
-                parts = col.split()
-                col_name = parts[-1]  # Take last part
+                # Simple column name (might have table prefix like "table.column")
+                # Take the last part after splitting by space or dot
+                if '.' in col:
+                    col_name = col.split('.')[-1].strip()
+                else:
+                    parts_split = col.split()
+                    col_name = parts_split[-1] if parts_split else col
                 col_name = strip_quotes(col_name)
                 columns.append(col_name)
             else:
-                # Simple column name
+                # Simple column name or function without alias
                 col = strip_quotes(col)
+                # If it's a function call without alias, try to extract a meaningful name
+                # For now, just use as-is (user should use AS alias for functions)
                 columns.append(col)
         
         return columns
@@ -1761,9 +1792,15 @@ def write_detail_table(ws, detail_records: List[Dict[str, Any]],
             # Try to extract column names from query
             query_columns = extract_column_names_from_query(worksheet_config.query)
             if query_columns:
+                print(f"  DEBUG: Extracted {len(query_columns)} columns from query: {query_columns}")
+                if worksheet_config.exclude_from_detail:
+                    print(f"  DEBUG: Excluding columns from detail: {worksheet_config.exclude_from_detail}")
                 columns = [col for col in query_columns if not should_exclude_column(col)]
+                excluded = [col for col in query_columns if should_exclude_column(col)]
+                if excluded:
+                    print(f"  DEBUG: Excluded {len(excluded)} column(s) from detail headers: {excluded}")
                 column_map = {col: col for col in columns}
-                print(f"  INFO: No data for worksheet '{worksheet_config.name}', extracted {len(columns)} column names from query for headers.")
+                print(f"  INFO: No data for worksheet '{worksheet_config.name}', extracted {len(columns)} column names from query for headers (after exclusions).")
             else:
                 # Still can't determine headers - use empty list but still write something
                 print(f"  WARNING: No data and cannot determine column names for worksheet '{worksheet_config.name}'. Headers will be empty.")
