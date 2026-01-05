@@ -1656,7 +1656,22 @@ def extract_column_names_from_query(query: str) -> List[str]:
     """
     Extract column names from SQL SELECT query.
     Handles aliases (e.g., 'YEAR(date) AS Year' -> 'Year')
+    Strips quotes (single, double, backticks) from column names
     """
+    def strip_quotes(text: str) -> str:
+        """Remove surrounding quotes from text"""
+        text = text.strip()
+        # Remove double quotes
+        if text.startswith('"') and text.endswith('"'):
+            text = text[1:-1]
+        # Remove single quotes
+        if text.startswith("'") and text.endswith("'"):
+            text = text[1:-1]
+        # Remove backticks
+        if text.startswith('`') and text.endswith('`'):
+            text = text[1:-1]
+        return text.strip()
+    
     try:
         # Find SELECT clause
         select_start = query.upper().find('SELECT')
@@ -1674,15 +1689,21 @@ def extract_column_names_from_query(query: str) -> List[str]:
         for col in select_clause.split(','):
             col = col.strip()
             # Handle AS alias (e.g., "YEAR(date) AS Year" -> "Year")
-            if ' AS ' in col.upper():
-                alias = col.upper().split(' AS ')[-1].strip()
+            # Use case-insensitive search but preserve original case
+            as_match = re.search(r'\s+AS\s+', col, re.IGNORECASE)
+            if as_match:
+                alias = col[as_match.end():].strip()
+                alias = strip_quotes(alias)
                 columns.append(alias)
             elif ' ' in col and not col.startswith('('):
                 # Simple column name (might have table prefix)
                 parts = col.split()
-                columns.append(parts[-1])  # Take last part
+                col_name = parts[-1]  # Take last part
+                col_name = strip_quotes(col_name)
+                columns.append(col_name)
             else:
                 # Simple column name
+                col = strip_quotes(col)
                 columns.append(col)
         
         return columns
