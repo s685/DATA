@@ -1135,7 +1135,13 @@ def generate_summary(detail_records: List[Dict[str, Any]], summary_config: Summa
             # Try exact match first
             if field_name in record:
                 return record[field_name]
-            # Try case-insensitive match
+            # Normalize both field_name and record keys for comparison (handles spaces, underscores, hyphens)
+            field_normalized = field_name.upper().replace('_', '').replace(' ', '').replace('-', '')
+            for key, value in record.items():
+                key_normalized = key.upper().replace('_', '').replace(' ', '').replace('-', '')
+                if key_normalized == field_normalized:
+                    return value
+            # Try case-insensitive exact match
             for key, value in record.items():
                 if key.upper() == field_name.upper():
                     return value
@@ -1145,6 +1151,9 @@ def generate_summary(detail_records: List[Dict[str, Any]], summary_config: Summa
                 field_name.lower(),
                 field_name.upper(),
                 field_name.replace('_', ' '),
+                field_name.replace(' ', '_'),
+                field_name.replace('_', '-'),
+                field_name.replace('-', '_'),
                 # Handle shortened versions (e.g., Resident_St vs Resident_State)
                 field_name.replace('_State', '_St'),
                 field_name.replace('_State', 'State'),
@@ -1271,6 +1280,13 @@ def generate_summary(detail_records: List[Dict[str, Any]], summary_config: Summa
                 def get_field_val(record, field_name):
                     if field_name in record:
                         return record[field_name]
+                    # Normalize both field_name and record keys for comparison
+                    field_normalized = field_name.upper().replace('_', '').replace(' ', '').replace('-', '')
+                    for key, val in record.items():
+                        key_normalized = key.upper().replace('_', '').replace(' ', '').replace('-', '')
+                        if key_normalized == field_normalized:
+                            return val
+                    # Try case-insensitive exact match
                     for key, val in record.items():
                         if key.upper() == field_name.upper():
                             return val
@@ -1280,6 +1296,9 @@ def generate_summary(detail_records: List[Dict[str, Any]], summary_config: Summa
                         field_name.lower(),
                         field_name.upper(),
                         field_name.replace('_', ' '),
+                        field_name.replace(' ', '_'),
+                        field_name.replace('_', '-'),
+                        field_name.replace('-', '_'),
                     ]
                     for var in variations:
                         if var in record:
@@ -1336,6 +1355,13 @@ def generate_summary(detail_records: List[Dict[str, Any]], summary_config: Summa
                 def get_field_val(record, field_name):
                     if field_name in record:
                         return record[field_name]
+                    # Normalize both field_name and record keys for comparison
+                    field_normalized = field_name.upper().replace('_', '').replace(' ', '').replace('-', '')
+                    for key, val in record.items():
+                        key_normalized = key.upper().replace('_', '').replace(' ', '').replace('-', '')
+                        if key_normalized == field_normalized:
+                            return val
+                    # Try case-insensitive exact match
                     for key, val in record.items():
                         if key.upper() == field_name.upper():
                             return val
@@ -1345,6 +1371,9 @@ def generate_summary(detail_records: List[Dict[str, Any]], summary_config: Summa
                         field_name.lower(),
                         field_name.upper(),
                         field_name.replace('_', ' '),
+                        field_name.replace(' ', '_'),
+                        field_name.replace('_', '-'),
+                        field_name.replace('-', '_'),
                     ]
                     for var in variations:
                         if var in record:
