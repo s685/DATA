@@ -449,15 +449,28 @@ def get_hardcoded_worksheet_structure(worksheet_name: str, table_name: str) -> O
             formatting=FormattingConfig(header_row=1, filters=False)  # No filters for summary-only
         )
     
-    # Worksheet 1-004 - Detail records only (no summaries)
+    # Worksheet 1-004 - Detail records + Issue State/Resident State summaries
     elif worksheet_name == '1-004':
         return WorksheetConfig(
             name='1-004',
             query=f"SELECT Policy, Lapse_Da, Stati, Status_Reas, Company, Issue_St, Resident_St FROM {table_name} WHERE Schedule_ID = '1-004'",
             detail_start_column='A',
             detail_columns=None,  # Use actual column names from query results
-            spacing_columns=[],
-            summary_config=None,  # No summaries - detail only
+            spacing_columns=['H'],  # One column gap between detail (A-G) and summaries
+            summary_config=[
+                SummaryConfig(
+                    group_by='Issue_St',  # Using Issue_St from query (case-insensitive matching will handle Issue_State)
+                    aggregates=[AggregateConfig(field='', function='COUNT', label='Count')],  # Empty field = count records
+                    start_column='I',  # Start after gap column H (Issue State: I-J)
+                    columns=['Issue State', 'Count']
+                ),
+                SummaryConfig(
+                    group_by='Resident_St',  # Using Resident_St from query (case-insensitive matching will handle Resident_State)
+                    aggregates=[AggregateConfig(field='', function='COUNT', label='Count')],  # Empty field = count records
+                    start_column='L',  # One column gap after Issue State summary (gap K, Resident State: L-M)
+                    columns=['Resident State', 'Count']
+                )
+            ],
             formatting=FormattingConfig(header_row=1, filters=True)
         )
     

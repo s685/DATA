@@ -27,10 +27,10 @@ worksheets:
     #   FROM <your_schedule1_table_name>
     #   WHERE Schedule_ID = '1-001'
   
-  # 1-004: Detail records only (no summaries)
+  # 1-004: Detail records + Issue State/Resident State summaries
   1-004:
     table_name: <your_schedule1_table_name>
-    template_type: direct_dump
+    template_type: direct_dump_state_summary
     # Optional: Custom query
     # query: |
     #   SELECT Policy, Lapse_Da, Stati, Status_Reas, Company, Issue_St, Resident_St
