@@ -1742,20 +1742,25 @@ def write_detail_table(ws, detail_records: List[Dict[str, Any]],
 
 
 def write_summary_table(ws, summary_data: List[Dict[str, Any]], 
-                        summary_config: SummaryConfig, start_row: int = 1):
-    """Write summary table to worksheet with Grand Total row formatting"""
-    if not summary_data:
-        print(f"  WARNING: No summary data to write for group_by='{summary_config.group_by}'. Summary table will be empty.")
-        return
-    
-    print(f"  DEBUG: Writing summary table for group_by='{summary_config.group_by}' with {len(summary_data)} rows")
-    
+                        summary_config: SummaryConfig, start_row: int = 1,
+                        worksheet_config: Optional[WorksheetConfig] = None):
+    """Write summary table to worksheet with Grand Total row formatting - always writes headers even if no data"""
     start_col_idx = column_letter_to_index(summary_config.start_column)
     header_row = start_row
     
-    # Write headers
+    # Always write headers even if no data
     for col_idx, col_name in enumerate(summary_config.columns):
         apply_cell_formatting(ws, header_row, start_col_idx + col_idx, col_name, is_header=True)
+    
+    if not summary_data:
+        print(f"  WARNING: No summary data to write for group_by='{summary_config.group_by}'. Headers have been written.")
+        # Apply filters to header row only if filters are enabled
+        if worksheet_config and worksheet_config.formatting and worksheet_config.formatting.filters:
+            end_col_idx = start_col_idx + len(summary_config.columns) - 1
+            ws.auto_filter.ref = f"{index_to_column_letter(start_col_idx)}{header_row}:{index_to_column_letter(end_col_idx)}{header_row}"
+        return header_row + 1
+    
+    print(f"  DEBUG: Writing summary table for group_by='{summary_config.group_by}' with {len(summary_data)} rows")
     
     # Write data rows
     data_start_row = header_row + 1
@@ -1782,6 +1787,12 @@ def write_summary_table(ws, summary_data: List[Dict[str, Any]],
             # The Grand Total value is already in the CountOfPolicy No column
             # But if we need to add it in a separate cell, we can do it here
             pass
+    
+    # Apply filters if configured (same as detail tables)
+    if worksheet_config and worksheet_config.formatting and worksheet_config.formatting.filters:
+        end_col_idx = start_col_idx + len(summary_config.columns) - 1
+        end_row = data_start_row + len(summary_data) - 1
+        ws.auto_filter.ref = f"{index_to_column_letter(start_col_idx)}{header_row}:{index_to_column_letter(end_col_idx)}{end_row}"
     
     return data_start_row + len(summary_data)
 
@@ -2106,7 +2117,7 @@ def create_worksheet(wb: Workbook, worksheet_config: WorksheetConfig,
             
             for summary_config, summary_data in zip(worksheet_config.summary_config, summaries):
                 print(f"  DEBUG: Writing summary table for '{summary_config.group_by}' at column '{summary_config.start_column}', {len(summary_data)} rows")
-                write_summary_table(ws, summary_data, summary_config, start_row=header_row)
+                write_summary_table(ws, summary_data, summary_config, start_row=header_row, worksheet_config=worksheet_config)
     
     # Adjust column widths
     for column in ws.columns:
